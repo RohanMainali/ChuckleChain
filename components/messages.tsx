@@ -1,125 +1,249 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState, useEffect, useRef } from "react"
-import { formatDistanceToNow } from "date-fns"
-import { Send, ExternalLink } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import type { Conversation, Message as MessageType } from "@/lib/types"
-import { useAuth } from "@/components/auth-provider"
-import axios from "axios"
-import io from "socket.io-client"
-import { useRouter, useSearchParams } from "next/navigation"
-import Link from "next/link"
+import { useState, useEffect, useRef } from "react";
+import { formatDistanceToNow } from "date-fns";
+import {
+  Send,
+  ExternalLink,
+  Image,
+  MoreVertical,
+  Trash2,
+  Reply,
+  X,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import type { Conversation, Message as MessageType } from "@/lib/types";
+import { useAuth } from "@/components/auth-provider";
+import axios from "axios";
+import io from "socket.io-client";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 // Initialize socket connection
-let socket: any
+let socket: any;
 
 export function Messages() {
-  const { user } = useAuth()
-  const [conversations, setConversations] = useState<Conversation[]>([])
-  const [activeConversation, setActiveConversation] = useState<Conversation | null>(null)
-  const [newMessage, setNewMessage] = useState("")
-  const [loading, setLoading] = useState(true)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const socketInitialized = useRef(false)
+  const { user } = useAuth();
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeConversation, setActiveConversation] =
+    useState<Conversation | null>(null);
+  const [newMessage, setNewMessage] = useState("");
+  const [loading, setLoading] = useState(true);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const socketInitialized = useRef(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [messageImage, setMessageImage] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<MessageType | null>(null);
+  const [imagePreviewOpen, setImagePreviewOpen] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   // Initialize router at the beginning of the component
-  const router = useRouter()
-  const searchParams = useSearchParams()
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   // Check for shared post in URL
-  const sharedPostId = searchParams?.get("share")
+  const sharedPostId = searchParams?.get("share");
 
   useEffect(() => {
     // If there's a shared post ID in the URL, find a way to share it
     if (sharedPostId && activeConversation) {
-      const postUrl = `${window.location.origin}/post/${sharedPostId}`
-      setNewMessage(`Check out this meme: ${postUrl}`)
+      const postUrl = `${window.location.origin}/post/${sharedPostId}`;
+      setNewMessage(`Check out this meme: ${postUrl}`);
     }
-  }, [sharedPostId, activeConversation])
+  }, [sharedPostId, activeConversation]);
 
   // Initialize socket connection
   useEffect(() => {
     if (user && !socketInitialized.current) {
-      // Connect to the socket server
+      console.log("Initializing socket connection for messages");
+
+      // Connect to the socket server with auth token
+      const token = document.cookie.split("token=")[1]?.split(";")[0];
       socket = io("http://localhost:5001", {
         withCredentials: true,
-      })
+        auth: { token },
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+      });
+
+      // Debug socket connection
+      socket.on("connect", () => {
+        console.log("Socket connected successfully with ID:", socket.id);
+      });
+
+      socket.on("connect_error", (error) => {
+        console.error("Socket connection error:", error);
+      });
 
       // Listen for new messages
       socket.on("newMessage", (message: MessageType) => {
+        console.log("New message received via socket:", message);
+
         // Update the conversations with the new message
         setConversations((prevConversations) => {
-          return prevConversations.map((conv) => {
-            if (conv.id === message.conversationId) {
-              return {
-                ...conv,
-                messages: [...conv.messages, message],
-                lastMessage: {
-                  text: message.text,
-                  timestamp: message.timestamp,
-                },
-              }
-            }
-            return conv
-          })
-        })
+          // Check if this conversation already exists
+          const existingConvIndex = prevConversations.findIndex(
+            (conv) => conv.id === message.conversationId
+          );
+
+          if (existingConvIndex >= 0) {
+            // Update existing conversation
+            const updatedConversations = [...prevConversations];
+            const conversation = { ...updatedConversations[existingConvIndex] };
+
+            // Add the message to the conversation
+            conversation.messages = [...conversation.messages, message];
+            conversation.lastMessage = {
+              text: message.text,
+              timestamp: message.timestamp,
+            };
+
+            // Move this conversation to the top of the list
+            updatedConversations.splice(existingConvIndex, 1);
+            updatedConversations.unshift(conversation);
+
+            return updatedConversations;
+          } else {
+            // This is a new conversation - we should fetch the full conversation data
+            fetchConversations();
+            return prevConversations;
+          }
+        });
 
         // If the active conversation is the one receiving the message, update it
-        if (activeConversation?.id === message.conversationId) {
-          setActiveConversation((prev) => {
-            if (!prev) return null
-            return {
-              ...prev,
-              messages: [...prev.messages, message],
-              lastMessage: {
-                text: message.text,
-                timestamp: message.timestamp,
-              },
-            }
-          })
-        }
-      })
+        setActiveConversation((prev) => {
+          if (!prev || prev.id !== message.conversationId) return prev;
+          return {
+            ...prev,
+            messages: [...prev.messages, message],
+            lastMessage: {
+              text: message.text,
+              timestamp: message.timestamp,
+            },
+          };
+        });
+      });
 
-      socketInitialized.current = true
+      // Listen for message deletions
+      socket.on("messageDeleted", ({ messageId, conversationId }) => {
+        console.log("Message deletion notification received:", messageId);
+
+        // Update conversations
+        setConversations((prevConversations) =>
+          prevConversations.map((conv) => {
+            if (conv.id === conversationId) {
+              return {
+                ...conv,
+                messages: conv.messages.filter((msg) => msg.id !== messageId),
+              };
+            }
+            return conv;
+          })
+        );
+
+        // Update active conversation if needed
+        setActiveConversation((prev) => {
+          if (!prev || prev.id !== conversationId) return prev;
+          return {
+            ...prev,
+            messages: prev.messages.filter((msg) => msg.id !== messageId),
+          };
+        });
+      });
+
+      socketInitialized.current = true;
 
       // Clean up on unmount
       return () => {
-        socket.disconnect()
-        socketInitialized.current = false
-      }
+        console.log("Disconnecting socket");
+        socket.disconnect();
+        socketInitialized.current = false;
+      };
     }
-  }, [user])
+  }, [user]);
+
+  // Add a polling mechanism to fetch new messages periodically
+  useEffect(() => {
+    if (!user || !activeConversation) return;
+
+    // Set up polling for new messages every 5 seconds as a fallback
+    const intervalId = setInterval(() => {
+      if (activeConversation) {
+        // Fetch the latest messages for the active conversation
+        axios
+          .get(`/api/messages/conversations/${activeConversation.user.id}`)
+          .then(({ data }) => {
+            if (data.success) {
+              // Only update if there are new messages
+              if (
+                data.data.messages.length > activeConversation.messages.length
+              ) {
+                console.log("Polling found new messages");
+                setActiveConversation(data.data);
+
+                // Also update in the conversations list
+                setConversations((prev) =>
+                  prev.map((conv) =>
+                    conv.id === data.data.id ? data.data : conv
+                  )
+                );
+              }
+            }
+          })
+          .catch((error) => {
+            console.error("Error polling for messages:", error);
+          });
+      }
+    }, 5000);
+
+    return () => clearInterval(intervalId);
+  }, [user, activeConversation]);
+
+  // Add the fetchConversations function at the component level
+  const fetchConversations = async () => {
+    try {
+      setLoading(true);
+      const { data } = await axios.get("/api/messages/conversations");
+      if (data.success) {
+        setConversations(data.data);
+        // Set the first conversation as active if there is one and no active conversation
+        if (data.data.length > 0 && !activeConversation) {
+          setActiveConversation(data.data[0]);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching conversations:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Fetch conversations
   useEffect(() => {
-    const fetchConversations = async () => {
-      try {
-        setLoading(true)
-        const { data } = await axios.get("/api/messages/conversations")
-        if (data.success) {
-          setConversations(data.data)
-          // Set the first conversation as active if there is one
-          if (data.data.length > 0) {
-            setActiveConversation(data.data[0])
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching conversations:", error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
     if (user) {
-      fetchConversations()
+      fetchConversations();
     }
-  }, [user])
+  }, [user]);
 
   // Mark messages as read when viewing a conversation
   useEffect(() => {
@@ -130,38 +254,58 @@ export function Messages() {
         .then(() => {
           // Update the unread message count in the navbar (via socket)
           if (socket) {
-            socket.emit("messagesRead")
+            socket.emit("messagesRead");
           }
         })
         .catch((error) => {
-          console.error("Error marking messages as read:", error)
-        })
+          console.error("Error marking messages as read:", error);
+        });
     }
-  }, [activeConversation])
+  }, [activeConversation]);
 
   // Scroll to bottom when new messages are added
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [activeConversation?.messages])
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [activeConversation?.messages]);
 
+  // Update the handleSendMessage function to ensure images are properly stored
   const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
 
-    if (!newMessage.trim() || !activeConversation) return
+    if ((!newMessage.trim() && !messageImage) || !activeConversation) return;
 
     try {
+      let imageUrl = null;
+      if (messageImage) {
+        setIsUploading(true);
+        // Upload image to server
+        const uploadResponse = await axios.post("/api/upload", {
+          image: messageImage,
+          isMessageImage: true,
+        });
+
+        if (uploadResponse.data.success) {
+          imageUrl = uploadResponse.data.data.url;
+          console.log("Image uploaded successfully:", imageUrl);
+        } else {
+          throw new Error("Failed to upload image");
+        }
+      }
+
       // Optimistically add the message to the UI
       const tempMessage: MessageType = {
         id: `temp-${Date.now()}`,
         senderId: user?.id || "",
-        text: newMessage,
+        text: newMessage.trim() || (imageUrl ? "Sent an image" : ""),
         timestamp: new Date().toISOString(),
         conversationId: activeConversation.id,
-      }
+        image: imageUrl,
+        replyTo: replyingTo ? replyingTo.id : undefined,
+      };
 
       // Update the active conversation with the new message
       setActiveConversation((prev) => {
-        if (!prev) return null
+        if (!prev) return null;
         return {
           ...prev,
           messages: [...prev.messages, tempMessage],
@@ -169,8 +313,8 @@ export function Messages() {
             text: tempMessage.text,
             timestamp: tempMessage.timestamp,
           },
-        }
-      })
+        };
+      });
 
       // Update the conversations list
       setConversations((prevConversations) => {
@@ -183,33 +327,151 @@ export function Messages() {
                 text: tempMessage.text,
                 timestamp: tempMessage.timestamp,
               },
-            }
+            };
           }
-          return conv
-        })
-      })
+          return conv;
+        });
+      });
 
-      // Clear the input
-      setNewMessage("")
+      // Clear the input and reset states
+      setNewMessage("");
+      setMessageImage(null);
+      setReplyingTo(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
 
       // Send the message to the server
-      const { data } = await axios.post(`/api/messages/${activeConversation.id}`, {
-        text: tempMessage.text,
-      })
+      console.log("Sending message to server:", {
+        text: newMessage.trim() || (imageUrl ? "Sent an image" : ""),
+        image: imageUrl,
+        replyToId: replyingTo?.id,
+      });
+
+      const { data } = await axios.post(
+        `/api/messages/${activeConversation.id}`,
+        {
+          text: newMessage.trim() || (imageUrl ? "Sent an image" : ""),
+          image: imageUrl,
+          replyToId: replyingTo?.id,
+        }
+      );
 
       if (!data.success) {
-        console.error("Error sending message:", data)
-        // If there's an error, we could revert the optimistic update here
+        console.error("Error sending message:", data);
+        toast({
+          title: "Error",
+          description: "Failed to send message. Please try again.",
+          variant: "destructive",
+        });
+        // Revert the optimistic update
+        fetchConversations();
+      } else {
+        console.log("Message sent successfully:", data);
+        // Replace the temp message with the real one
+        setActiveConversation((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            messages: prev.messages.map((msg) =>
+              msg.id === tempMessage.id ? data.data : msg
+            ),
+          };
+        });
       }
     } catch (error) {
-      console.error("Error sending message:", error)
+      console.error("Error sending message:", error);
+      toast({
+        title: "Error",
+        description: "Failed to send message. Please try again.",
+        variant: "destructive",
+      });
       // Revert the optimistic update on error
+      fetchConversations();
+    } finally {
+      setIsUploading(false);
     }
-  }
+  };
+
+  const handleMessageImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: "File too large",
+          description: "Image size should be less than 10MB",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        console.log("Image loaded, size:", result.length);
+        setMessageImage(result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveMessageImage = () => {
+    setMessageImage(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const handleDeleteMessage = async (messageId: string) => {
+    if (!activeConversation) return;
+
+    try {
+      // Optimistically remove the message from UI
+      setActiveConversation((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          messages: prev.messages.filter((msg) => msg.id !== messageId),
+        };
+      });
+
+      // Call API to delete the message
+      const { data } = await axios.delete(
+        `/api/messages/${activeConversation.id}/${messageId}`
+      );
+
+      if (!data.success) {
+        // If deletion fails, revert the UI change
+        fetchConversations();
+        throw new Error("Failed to delete message");
+      }
+
+      toast({
+        title: "Message deleted",
+        description: "Your message has been deleted",
+      });
+    } catch (error) {
+      console.error("Error deleting message:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete message. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleReplyToMessage = (message: MessageType) => {
+    setReplyingTo(message);
+  };
+
+  const openImagePreview = (imageUrl: string) => {
+    setPreviewImage(imageUrl);
+    setImagePreviewOpen(true);
+  };
 
   // Render a shared post in the message
   const renderSharedPost = (message: MessageType) => {
-    if (!message.sharedPost) return null
+    if (!message.sharedPost) return null;
 
     return (
       <div className="mt-2 border rounded-md overflow-hidden">
@@ -229,70 +491,134 @@ export function Messages() {
               className="w-full h-32 object-cover"
             />
             <div className="absolute bottom-0 left-0 right-0 bg-black/50 p-2 text-white text-xs">
-              <div className="font-medium">@{message.sharedPost.user?.username || "unknown"}</div>
+              <div className="font-medium">
+                @{message.sharedPost.user?.username || "unknown"}
+              </div>
               <div className="truncate">{message.sharedPost.text || ""}</div>
             </div>
           </div>
         </Link>
       </div>
-    )
-  }
+    );
+  };
+
+  // Render a reply reference
+  const renderReplyReference = (message: MessageType) => {
+    if (!message.replyTo) return null;
+
+    // Find the message being replied to
+    const repliedMessage = activeConversation?.messages.find(
+      (msg) => msg.id === message.replyTo
+    );
+    if (!repliedMessage) return null;
+
+    // Determine if the replied message is from the current user
+    const isRepliedMessageFromCurrentUser =
+      repliedMessage.senderId === user?.id;
+
+    return (
+      <div className="mb-2">
+        <div
+          className={`px-3 py-2 rounded-lg mb-1 max-w-[250px] overflow-hidden ${
+            isRepliedMessageFromCurrentUser
+              ? "bg-purple-600/30 border-l-4 border-purple-600"
+              : "bg-gray-800/50 border-l-4 border-gray-600"
+          }`}
+        >
+          <div className="flex items-center gap-1 mb-1">
+            <Reply className="h-3 w-3 text-gray-400" />
+            <span className="text-xs text-gray-400">
+              Replying to{" "}
+              {isRepliedMessageFromCurrentUser
+                ? "yourself"
+                : activeConversation?.user.username}
+            </span>
+          </div>
+          <div className="text-sm truncate">
+            {repliedMessage.text ||
+              (repliedMessage.image ? (
+                <div className="flex items-center gap-1">
+                  <Image className="h-3 w-3" />
+                  <span>Image</span>
+                </div>
+              ) : (
+                "Message"
+              ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   if (loading) {
     return (
       <div className="flex h-[calc(100vh-5rem)] items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
       </div>
-    )
+    );
   }
 
   return (
-    <div className="flex h-[calc(100vh-5rem)] flex-col rounded-lg border md:flex-row">
+    <div className="flex h-[calc(100vh-5rem)] flex-col rounded-lg border md:flex-row bg-black text-white">
       {/* Conversations list */}
-      <div className="w-full border-b md:w-80 md:border-b-0 md:border-r">
-        <div className="p-4">
-          <h2 className="text-xl font-bold">Messages</h2>
+      <div className="w-full border-b md:w-80 md:border-b-0 md:border-r border-gray-800">
+        <div className="p-4 border-b border-gray-800">
+          <h2 className="text-2xl font-bold">Messages</h2>
         </div>
 
         <ScrollArea className="h-[calc(100vh-10rem)]">
-          <div className="space-y-1 p-2">
+          <div className="space-y-0">
             {conversations.length === 0 ? (
               <div className="flex flex-col items-center justify-center p-6 text-center">
-                <p className="text-muted-foreground">No conversations yet</p>
+                <p className="text-gray-400">No conversations yet</p>
               </div>
             ) : (
-              conversations.map((conversation, index) => (
-                <button
-                  key={conversation.id}
-                  className={`flex w-full items-center gap-3 rounded-lg p-3 text-left transition-all duration-300 hover:bg-muted animate-fade-in ${
-                    activeConversation?.id === conversation.id ? "bg-muted" : ""
-                  }`}
-                  style={{ animationDelay: `${index * 0.05}s` }}
-                  onClick={() => setActiveConversation(conversation)}
-                >
-                  <Avatar>
-                    <AvatarImage src={conversation.user.profilePicture} alt={conversation.user.username} />
-                    <AvatarFallback>{conversation.user.username.charAt(0).toUpperCase()}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 overflow-hidden">
-                    <div
-                      className="font-medium hover:underline cursor-pointer"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        router.push(`/profile/${conversation.user.username}`)
-                      }}
-                    >
-                      {conversation.user.username}
+              conversations.map((conversation) => {
+                // Check if there are unread messages in this conversation
+                const hasUnreadMessages = conversation.messages.some(
+                  (msg) => !msg.read && msg.senderId !== user?.id
+                );
+
+                return (
+                  <button
+                    key={conversation.id}
+                    className={`flex w-full items-center gap-3 p-4 text-left transition-all duration-300 hover:bg-gray-800 border-b border-gray-800 ${
+                      activeConversation?.id === conversation.id
+                        ? "bg-gray-800"
+                        : ""
+                    }`}
+                    onClick={() => setActiveConversation(conversation)}
+                  >
+                    <Avatar className="h-12 w-12">
+                      <AvatarImage
+                        src={conversation.user.profilePicture}
+                        alt={conversation.user.username}
+                      />
+                      <AvatarFallback>
+                        {conversation.user.username.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 overflow-hidden">
+                      <div
+                        className={`font-medium text-lg ${
+                          hasUnreadMessages ? "font-bold" : ""
+                        }`}
+                      >
+                        {conversation.user.username}
+                      </div>
+                      <div
+                        className={`truncate text-sm ${
+                          hasUnreadMessages
+                            ? "font-semibold text-white"
+                            : "text-gray-400"
+                        }`}
+                      >
+                        {conversation.lastMessage.text || "New conversation"}
+                      </div>
                     </div>
-                    <div className="truncate text-sm text-muted-foreground">{conversation.lastMessage.text}</div>
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {formatDistanceToNow(new Date(conversation.lastMessage.timestamp), {
-                      addSuffix: false,
-                    })}
-                  </div>
-                </button>
-              ))
+                  </button>
+                );
+              })
             )}
           </div>
         </ScrollArea>
@@ -301,81 +627,249 @@ export function Messages() {
       {/* Active conversation */}
       {activeConversation ? (
         <div className="flex flex-1 flex-col">
-          <div className="flex items-center gap-3 border-b p-4">
-            <Avatar>
-              <AvatarImage src={activeConversation.user.profilePicture} alt={activeConversation.user.username} />
-              <AvatarFallback>{activeConversation.user.username.charAt(0).toUpperCase()}</AvatarFallback>
+          <div className="flex items-center gap-3 border-b border-gray-800 p-4 bg-gray-900">
+            <Avatar className="h-10 w-10">
+              <AvatarImage
+                src={activeConversation.user.profilePicture}
+                alt={activeConversation.user.username}
+              />
+              <AvatarFallback>
+                {activeConversation.user.username.charAt(0).toUpperCase()}
+              </AvatarFallback>
             </Avatar>
             <div>
-              <div
-                className="font-medium hover:underline cursor-pointer"
-                onClick={() => router.push(`/profile/${activeConversation.user.username}`)}
-              >
+              <div className="font-medium text-lg">
                 {activeConversation.user.username}
               </div>
-              <div className="text-xs text-muted-foreground">Active now</div>
+              <div className="text-xs text-gray-400">Active now</div>
             </div>
           </div>
 
-          <ScrollArea className="flex-1 p-4">
+          <ScrollArea className="flex-1 p-4 bg-black">
             <div className="space-y-4">
               {activeConversation.messages.map((message, index) => {
-                const isCurrentUser = message.senderId === user?.id
+                const isCurrentUser = message.senderId === user?.id;
 
                 return (
                   <div
                     key={message.id}
-                    className={`flex ${isCurrentUser ? "justify-end" : "justify-start"} animate-fade-in`}
-                    style={{ animationDelay: `${index * 0.05}s` }}
+                    className={`flex ${
+                      isCurrentUser ? "justify-end" : "justify-start"
+                    }`}
                   >
                     <div
-                      className={`max-w-[70%] rounded-lg p-3 ${
-                        isCurrentUser ? "bg-primary text-primary-foreground" : "bg-muted"
-                      }`}
+                      className={`max-w-[70%] ${
+                        isCurrentUser ? "items-end" : "items-start"
+                      } flex flex-col`}
                     >
-                      <div>{message.text}</div>
-                      {message.sharedPost && renderSharedPost(message)}
+                      {/* Reply reference */}
+                      {message.replyTo && renderReplyReference(message)}
+
                       <div
-                        className={`mt-1 text-right text-xs ${
-                          isCurrentUser ? "text-primary-foreground/80" : "text-muted-foreground"
-                        }`}
+                        className={`rounded-lg px-4 py-2 ${
+                          isCurrentUser
+                            ? "bg-purple-600 text-white"
+                            : "bg-gray-800 text-white"
+                        } relative group`}
                       >
-                        {formatDistanceToNow(new Date(message.timestamp), {
-                          addSuffix: true,
-                        })}
+                        {/* Message text */}
+                        <div>{message.text}</div>
+
+                        {/* Message image if present */}
+                        {message.image && (
+                          <div className="mt-2">
+                            <img
+                              src={message.image || "/placeholder.svg"}
+                              alt="Message attachment"
+                              className="rounded-md max-h-60 object-cover cursor-pointer"
+                              onClick={() => openImagePreview(message.image!)}
+                            />
+                          </div>
+                        )}
+
+                        {/* Shared post if present */}
+                        {message.sharedPost && renderSharedPost(message)}
+
+                        {/* Message timestamp and actions */}
+                        <div className="mt-1 flex items-center justify-end gap-2 text-xs">
+                          <span
+                            className={
+                              isCurrentUser ? "text-white/80" : "text-gray-400"
+                            }
+                          >
+                            {formatDistanceToNow(new Date(message.timestamp), {
+                              addSuffix: true,
+                            })}
+                          </span>
+
+                          {/* Actions that appear on hover */}
+                          <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5 rounded-full hover:bg-gray-700"
+                              onClick={() => handleReplyToMessage(message)}
+                            >
+                              <Reply className="h-3 w-3" />
+                            </Button>
+
+                            {isCurrentUser && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-5 w-5 rounded-full text-white hover:bg-purple-700"
+                                  >
+                                    <MoreVertical className="h-3 w-3" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent
+                                  align="end"
+                                  className="bg-gray-900 text-white border-gray-700"
+                                >
+                                  <DropdownMenuItem
+                                    onClick={() =>
+                                      handleDeleteMessage(message.id)
+                                    }
+                                    className="text-red-400 hover:bg-gray-800"
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
-                )
+                );
               })}
               <div ref={messagesEndRef} />
             </div>
           </ScrollArea>
 
-          <form onSubmit={handleSendMessage} className="flex gap-2 border-t p-4">
-            <Input
-              placeholder="Type a message..."
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              className="flex-1"
-            />
+          {/* Reply indicator */}
+          {replyingTo && (
+            <div className="px-4 py-2 border-t border-gray-800 flex items-center gap-2 bg-gray-900">
+              <div className="flex-1 border-l-4 border-purple-600 pl-2 py-1">
+                <div className="flex items-center gap-1">
+                  <Reply className="h-4 w-4 text-gray-400" />
+                  <div className="text-xs text-gray-400">
+                    Replying to{" "}
+                    {replyingTo.senderId === user?.id
+                      ? "yourself"
+                      : activeConversation.user.username}
+                  </div>
+                </div>
+                <div className="text-sm truncate">
+                  {replyingTo.text || (replyingTo.image ? "Image" : "Message")}
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 rounded-full hover:bg-gray-800"
+                onClick={() => setReplyingTo(null)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+
+          {/* Message input with image preview */}
+          {messageImage && (
+            <div className="px-4 py-2 border-t border-gray-800 bg-gray-900">
+              <div className="relative inline-block">
+                <img
+                  src={messageImage || "/placeholder.svg"}
+                  alt="Message attachment preview"
+                  className="rounded-md h-20 object-cover"
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1 top-1 h-6 w-6 rounded-full bg-black/80 hover:bg-black"
+                  onClick={handleRemoveMessageImage}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          <form
+            onSubmit={handleSendMessage}
+            className="flex gap-2 border-t border-gray-800 p-4 bg-gray-900"
+          >
+            <div className="relative flex-1">
+              <Input
+                placeholder="Type a message..."
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                className="pr-10 bg-gray-800 border-gray-700 text-white placeholder:text-gray-400 focus-visible:ring-purple-600"
+                disabled={isUploading}
+              />
+              <input
+                type="file"
+                accept="image/*"
+                ref={fileInputRef}
+                onChange={handleMessageImageChange}
+                className="hidden"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full hover:bg-gray-700"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+              >
+                <Image className="h-4 w-4" />
+              </Button>
+            </div>
             <Button
               type="submit"
               size="icon"
-              disabled={!newMessage.trim()}
-              className="transition-all duration-300 hover:scale-110"
+              disabled={(!newMessage.trim() && !messageImage) || isUploading}
+              className="bg-purple-600 hover:bg-purple-700 transition-all duration-300 hover:scale-110"
             >
-              <Send className="h-4 w-4" />
+              {isUploading ? (
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
             </Button>
           </form>
         </div>
       ) : (
-        <div className="flex flex-1 flex-col items-center justify-center p-4 text-center">
+        <div className="flex flex-1 flex-col items-center justify-center p-4 text-center bg-black">
           <h3 className="text-lg font-medium">No conversation selected</h3>
-          <p className="text-muted-foreground">Select a conversation from the list to start chatting</p>
+          <p className="text-gray-400">
+            Select a conversation from the list to start chatting
+          </p>
         </div>
       )}
-    </div>
-  )
-}
 
+      {/* Image preview dialog */}
+      <Dialog open={imagePreviewOpen} onOpenChange={setImagePreviewOpen}>
+        <DialogContent className="max-w-3xl p-4 bg-gray-900 border-gray-800">
+          <DialogHeader>
+            <DialogTitle className="text-white">Image</DialogTitle>
+          </DialogHeader>
+          {previewImage && (
+            <div className="flex justify-center">
+              <img
+                src={previewImage || "/placeholder.svg"}
+                alt="Full size preview"
+                className="max-h-[70vh] object-contain"
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

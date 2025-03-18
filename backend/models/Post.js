@@ -1,4 +1,4 @@
-const mongoose = require("mongoose")
+const mongoose = require("mongoose");
 
 const MemeTextSchema = new mongoose.Schema({
   text: String,
@@ -18,7 +18,7 @@ const MemeTextSchema = new mongoose.Schema({
   underline: Boolean,
   uppercase: Boolean,
   outline: Boolean,
-})
+});
 
 const CommentSchema = new mongoose.Schema({
   user: {
@@ -34,7 +34,24 @@ const CommentSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
-})
+  // Add fields for comment replies
+  replyTo: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Comment",
+    default: null,
+  },
+  likes: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+  ],
+});
+
+// Add a virtual for like count on comments
+CommentSchema.virtual("likeCount").get(function () {
+  return this.likes ? this.likes.length : 0;
+});
 
 const PostSchema = new mongoose.Schema(
   {
@@ -53,7 +70,16 @@ const PostSchema = new mongoose.Schema(
     },
     category: {
       type: String,
-      enum: ["entertainment", "sports", "gaming", "technology", "fashion", "music", "tv", "other"],
+      enum: [
+        "entertainment",
+        "sports",
+        "gaming",
+        "technology",
+        "fashion",
+        "music",
+        "tv",
+        "other",
+      ],
       default: "other",
     },
     memeTexts: [MemeTextSchema],
@@ -78,18 +104,17 @@ const PostSchema = new mongoose.Schema(
   {
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
-  },
-)
+  }
+);
 
 // Virtual for like count
 PostSchema.virtual("likeCount").get(function () {
-  return this.likes.length
-})
+  return this.likes.length;
+});
 
 // Virtual for comment count
 PostSchema.virtual("commentCount").get(function () {
-  return this.comments.length
-})
+  return this.comments.length;
+});
 
-module.exports = mongoose.model("Post", PostSchema)
-
+module.exports = mongoose.model("Post", PostSchema);

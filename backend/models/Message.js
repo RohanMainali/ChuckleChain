@@ -1,4 +1,4 @@
-const mongoose = require("mongoose")
+const mongoose = require("mongoose");
 
 const SharedPostSchema = new mongoose.Schema(
   {
@@ -16,8 +16,8 @@ const SharedPostSchema = new mongoose.Schema(
       username: String,
     },
   },
-  { _id: false },
-)
+  { _id: false }
+);
 
 const MessageSchema = new mongoose.Schema({
   conversationId: {
@@ -32,9 +32,18 @@ const MessageSchema = new mongoose.Schema({
   },
   text: {
     type: String,
-    required: true,
+    default: "",
   },
   sharedPost: SharedPostSchema,
+  image: {
+    type: String,
+    default: null,
+  },
+  replyTo: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Message",
+    default: null,
+  },
   read: {
     type: Boolean,
     default: false,
@@ -43,7 +52,6 @@ const MessageSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
-})
+});
 
-module.exports = mongoose.model("Message", MessageSchema)
-
+module.exports = mongoose.model("Message", MessageSchema);

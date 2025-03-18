@@ -1,146 +1,164 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState, useEffect } from "react"
-import Link from "next/link"
-import { useRouter, usePathname } from "next/navigation"
-import { Bell, Home, LaughIcon, LogOut, MessageSquare, Search } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { useAuth } from "@/components/auth-provider"
-import { ModeToggle } from "@/components/mode-toggle"
-import axios from "axios"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { useRouter, usePathname } from "next/navigation";
+import {
+  Bell,
+  Home,
+  LaughIcon,
+  LogOut,
+  MessageSquare,
+  Search,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useAuth } from "@/components/auth-provider";
+import { ModeToggle } from "@/components/mode-toggle";
+import axios from "axios";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export function Navbar() {
-  const { user, logout } = useAuth()
-  const router = useRouter()
-  const pathname = usePathname()
-  const [unreadNotifications, setUnreadNotifications] = useState(0)
-  const [unreadMessages, setUnreadMessages] = useState(0)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [searchResults, setSearchResults] = useState<any[]>([])
-  const [showSearchResults, setShowSearchResults] = useState(false)
+  const { user, logout } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
 
   const handleLogout = () => {
-    logout()
-    router.push("/")
-  }
+    logout();
+    router.push("/");
+  };
 
   // Fetch unread notification count
   useEffect(() => {
     const fetchUnreadCount = async () => {
       if (user) {
         try {
-          const { data } = await axios.get("/api/notifications/count")
+          const { data } = await axios.get("/api/notifications/count");
           if (data.success) {
-            setUnreadNotifications(data.data.count)
+            setUnreadNotifications(data.data.count);
           }
         } catch (error) {
-          console.error("Error fetching notification count:", error)
+          console.error("Error fetching notification count:", error);
         }
       }
-    }
+    };
 
-    fetchUnreadCount()
+    fetchUnreadCount();
 
     // Set up socket listener for new notifications
-    const socket = (window as any).socket
+    const socket = (window as any).socket;
     if (socket) {
       socket.on("newNotification", () => {
-        fetchUnreadCount()
-      })
+        fetchUnreadCount();
+      });
     }
 
     // Refresh count every minute
-    const interval = setInterval(fetchUnreadCount, 60000)
+    const interval = setInterval(fetchUnreadCount, 60000);
 
     return () => {
-      clearInterval(interval)
+      clearInterval(interval);
       if (socket) {
-        socket.off("newNotification")
+        socket.off("newNotification");
       }
-    }
-  }, [user])
+    };
+  }, [user]);
 
   // Add this useEffect after the existing useEffect for unread notifications
   useEffect(() => {
     const fetchUnreadMessages = async () => {
       if (user) {
         try {
-          const { data } = await axios.get("/api/messages/unread-count")
+          const { data } = await axios.get("/api/messages/unread-count");
           if (data.success) {
-            setUnreadMessages(data.data.count)
+            // Now we're counting conversations with unread messages, not total messages
+            setUnreadMessages(data.data.conversationsWithUnread || 0);
           }
         } catch (error) {
-          console.error("Error fetching unread messages count:", error)
+          console.error("Error fetching unread messages count:", error);
         }
       }
-    }
+    };
 
-    fetchUnreadMessages()
+    fetchUnreadMessages();
 
     // Set up socket listener for new messages
-    const socket = (window as any).socket
+    const socket = (window as any).socket;
     if (socket) {
-      socket.on("newMessage", () => {
-        setUnreadMessages((prev) => prev + 1)
-      })
+      socket.on("newMessage", (message: any) => {
+        // Only increment if this is from a different user
+        if (message.senderId !== user?.id) {
+          // We'll increment the count of conversations with unread messages
+          // In a real app, we'd need to check if this is from a new conversation
+          setUnreadMessages((prev) => prev + 1);
+        }
+      });
 
       // Add listener for updateUnreadCount event
       socket.on("updateUnreadCount", () => {
-        fetchUnreadMessages()
-      })
+        fetchUnreadMessages();
+      });
     }
 
     // Refresh count every minute
-    const interval = setInterval(fetchUnreadMessages, 60000)
+    const interval = setInterval(fetchUnreadMessages, 60000);
 
     return () => {
-      clearInterval(interval)
+      clearInterval(interval);
       if (socket) {
-        socket.off("newMessage")
-        socket.off("updateUnreadCount")
+        socket.off("newMessage");
+        socket.off("updateUnreadCount");
       }
-    }
-  }, [user])
+    };
+  }, [user]);
 
   const handleSearchChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const query = e.target.value
-    setSearchQuery(query)
+    const query = e.target.value;
+    setSearchQuery(query);
 
     if (query.trim().length < 2) {
-      setSearchResults([])
-      return
+      setSearchResults([]);
+      return;
     }
 
     try {
-      const { data } = await axios.get(`/api/users/search?q=${encodeURIComponent(query)}`)
+      const { data } = await axios.get(
+        `/api/users/search?q=${encodeURIComponent(query)}`
+      );
       if (data.success) {
-        setSearchResults(data.data)
+        setSearchResults(data.data);
       }
     } catch (error) {
-      console.error("Error searching users:", error)
+      console.error("Error searching users:", error);
     }
-  }
+  };
 
   useEffect(() => {
-    setSearchResults([])
-    setSearchQuery("")
-    setShowSearchResults(false)
-  }, [pathname])
+    setSearchResults([]);
+    setSearchQuery("");
+    setShowSearchResults(false);
+  }, [pathname]);
 
   return (
     <header className="sticky top-0 z-50 border-b bg-background">
-      <div className="container flex h-16 items-center justify-between px-4">
+      <div className="flex h-16 items-center justify-between w-full px-6">
         <div className="flex items-center gap-2 md:gap-4">
-          <Link href="/feed" className="flex items-center gap-2 text-xl font-bold">
+          <Link
+            href="/feed"
+            className="flex items-center gap-2 text-xl font-bold"
+          >
             <LaughIcon className="h-8 w-8 text-primary" />
             <span className="hidden md:inline">ChuckleChain</span>
           </Link>
 
-          <div className="relative ml-4 hidden md:block">
+          <div className="relative ml-2 hidden md:block">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
@@ -160,12 +178,21 @@ export function Navbar() {
                     className="flex items-center gap-3 p-3 hover:bg-muted transition-colors"
                   >
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={user.profilePicture} alt={user.username} />
-                      <AvatarFallback>{user.username.charAt(0).toUpperCase()}</AvatarFallback>
+                      <AvatarImage
+                        src={user.profilePicture}
+                        alt={user.username}
+                      />
+                      <AvatarFallback>
+                        {user.username.charAt(0).toUpperCase()}
+                      </AvatarFallback>
                     </Avatar>
                     <div>
                       <div className="font-medium">{user.username}</div>
-                      {user.fullName && <div className="text-xs text-muted-foreground">{user.fullName}</div>}
+                      {user.fullName && (
+                        <div className="text-xs text-muted-foreground">
+                          {user.fullName}
+                        </div>
+                      )}
                     </div>
                   </Link>
                 ))}
@@ -174,7 +201,7 @@ export function Navbar() {
           </div>
         </div>
 
-        <nav className="flex items-center gap-1 md:gap-2">
+        <nav className="flex items-center gap-3 md:gap-6">
           <Link href="/feed">
             <Button
               variant={pathname === "/feed" ? "default" : "ghost"}
@@ -232,6 +259,5 @@ export function Navbar() {
         </nav>
       </div>
     </header>
-  )
+  );
 }
-
