@@ -1,88 +1,106 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { MainLayout } from "@/components/main-layout"
-import { Post } from "@/components/post"
-import { useAuth } from "@/components/auth-provider"
-import type { Post as PostType } from "@/lib/types"
-import axios from "axios"
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { MainLayout } from "@/components/main-layout";
+import { Post } from "@/components/post";
+import { useAuth } from "@/components/auth-provider";
+import type { Post as PostType } from "@/lib/types";
+import axios from "axios";
 
 export default function PostPage({ params }: { params: { id: string } }) {
-  const { user } = useAuth()
-  const router = useRouter()
-  const [post, setPost] = useState<PostType | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { user } = useAuth();
+  const router = useRouter();
+  const [post, setPost] = useState<PostType | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchPost = async () => {
       if (user) {
         try {
-          setLoading(true)
-          const { data } = await axios.get(`/api/posts/${params.id}`)
+          setLoading(true);
+          const { data } = await axios.get(`/api/posts/${params.id}`);
           if (data.success) {
-            setPost(data.data)
+            setPost(data.data);
           }
         } catch (error) {
-          console.error("Error fetching post:", error)
-          setError("Post not found or you don't have permission to view it.")
+          console.error("Error fetching post:", error);
+          setError("Post not found or you don't have permission to view it.");
         } finally {
-          setLoading(false)
+          setLoading(false);
         }
       }
-    }
+    };
 
     if (user) {
-      fetchPost()
+      fetchPost();
     }
-  }, [params.id, user])
+  }, [params.id, user]);
 
   const handleDeletePost = async (postId: string) => {
     try {
-      await axios.delete(`/api/posts/${postId}`)
-      router.push("/feed")
+      await axios.delete(`/api/posts/${postId}`);
+      router.push("/feed");
     } catch (error) {
-      console.error("Error deleting post:", error)
+      console.error("Error deleting post:", error);
     }
-  }
+  };
 
   const handleLikePost = async (postId: string) => {
     try {
-      const { data } = await axios.put(`/api/posts/${postId}/like`)
+      const { data } = await axios.put(`/api/posts/${postId}/like`);
 
       if (data.success) {
         setPost((prevPost) => {
-          if (!prevPost) return null
+          if (!prevPost) return null;
           return {
             ...prevPost,
             isLiked: data.data.isLiked,
             likes: data.data.isLiked ? prevPost.likes + 1 : prevPost.likes - 1,
-          }
-        })
+          };
+        });
       }
     } catch (error) {
-      console.error("Error liking post:", error)
+      console.error("Error liking post:", error);
     }
-  }
+  };
 
-  const handleAddComment = async (postId: string, comment: { id: string; user: string; text: string }) => {
+  // Update the handleAddComment function to properly handle refresh triggers
+  const handleAddComment = async (
+    postId: string,
+    comment: {
+      id: string;
+      user: string;
+      text: string;
+      isRefreshTrigger?: boolean;
+    }
+  ) => {
+    // If this is just a refresh trigger, don't make an API call
+    if (comment.isRefreshTrigger) {
+      // Create a new post object to force a re-render
+      setPost((currentPost) => (currentPost ? { ...currentPost } : null));
+      return;
+    }
+
     try {
-      const { data } = await axios.post(`/api/posts/${postId}/comments`, { text: comment.text })
+      const { data } = await axios.post(`/api/posts/${postId}/comments`, {
+        text: comment.text,
+      });
 
       if (data.success) {
         setPost((prevPost) => {
-          if (!prevPost) return null
+          if (!prevPost) return null;
           return {
             ...prevPost,
             comments: [...prevPost.comments, data.data],
-          }
-        })
+          };
+        });
       }
     } catch (error) {
-      console.error("Error adding comment:", error)
+      console.error("Error adding comment:", error);
     }
-  }
+  };
 
   return (
     <MainLayout>
@@ -99,10 +117,14 @@ export default function PostPage({ params }: { params: { id: string } }) {
         </div>
       ) : post ? (
         <div className="mx-auto max-w-2xl">
-          <Post post={post} onDelete={handleDeletePost} onLike={handleLikePost} onComment={handleAddComment} />
+          <Post
+            post={post}
+            onDelete={handleDeletePost}
+            onLike={handleLikePost}
+            onComment={handleAddComment}
+          />
         </div>
       ) : null}
     </MainLayout>
-  )
+  );
 }
-
