@@ -7,14 +7,18 @@ try {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  reactStrictMode: true,
+  images: {
+    domains: ['res.cloudinary.com'],
+  },
+  env: {
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'https://chucklechain-api.onrender.com',
+  },
   eslint: {
     ignoreDuringBuilds: true,
   },
   typescript: {
     ignoreBuildErrors: true,
-  },
-  images: {
-    unoptimized: true,
   },
   experimental: {
     webpackBuildWorker: true,
@@ -46,3 +50,4 @@ function mergeConfig(nextConfig, userConfig) {
 }
 
 export default nextConfig
+
