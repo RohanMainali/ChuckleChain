@@ -9,6 +9,36 @@ import axios from "axios"
 // Update the axios configuration to use environment variables
 axios.defaults.baseURL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001"
 axios.defaults.withCredentials = true
+axios.defaults.timeout = 10000 // 10 second timeout
+
+// Add request interceptor for debugging
+axios.interceptors.request.use(
+  (config) => {
+    console.log(`Making ${config.method?.toUpperCase()} request to ${config.url}`)
+    return config
+  },
+  (error) => {
+    console.error("Request error:", error)
+    return Promise.reject(error)
+  },
+)
+
+// Add response interceptor for debugging
+axios.interceptors.response.use(
+  (response) => {
+    return response
+  },
+  (error) => {
+    if (error.response) {
+      console.error(`Response error ${error.response.status}:`, error.response.data)
+    } else if (error.request) {
+      console.error("No response received:", error.request)
+    } else {
+      console.error("Error setting up request:", error.message)
+    }
+    return Promise.reject(error)
+  },
+)
 
 type AuthContextType = {
   user: User | null
