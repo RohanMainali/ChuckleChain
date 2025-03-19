@@ -16,17 +16,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useAuth } from "@/components/auth-provider";
-import { Bell, Lock, Palette, User, Shield, AlertTriangle } from "lucide-react";
+import { Lock, Palette, User, Shield, AlertTriangle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import axios from "axios";
 
@@ -43,10 +36,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const [darkModePreference, setDarkModePreference] = useState(
     theme || "system"
   );
-  const [contentFilter, setContentFilter] = useState("standard");
   const [fontScale, setFontScale] = useState([1]);
   const [privacySettings, setPrivacySettings] = useState({
-    profileVisibility: "public",
     allowTagging: true,
     showOnlineStatus: true,
     showReadReceipts: true,
@@ -116,13 +107,11 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
           // For now, we'll use default settings
           // In a real app, these would come from the API
           setPrivacySettings({
-            profileVisibility: "public",
             allowTagging: true,
             showOnlineStatus: true,
             showReadReceipts: true,
           });
 
-          setContentFilter("standard");
           setNotificationsEnabled(true);
 
           setAccountSettings({
@@ -350,7 +339,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
           </DialogHeader>
 
           <Tabs defaultValue="account" className="mt-4">
-            <TabsList className="grid grid-cols-5 mb-4">
+            <TabsList className="grid grid-cols-4 mb-4">
               <TabsTrigger value="account" className="flex items-center gap-2">
                 <User className="h-4 w-4" />
                 <span className="hidden sm:inline">Account</span>
@@ -361,13 +350,6 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               >
                 <Palette className="h-4 w-4" />
                 <span className="hidden sm:inline">Appearance</span>
-              </TabsTrigger>
-              <TabsTrigger
-                value="notifications"
-                className="flex items-center gap-2"
-              >
-                <Bell className="h-4 w-4" />
-                <span className="hidden sm:inline">Notifications</span>
               </TabsTrigger>
               <TabsTrigger value="privacy" className="flex items-center gap-2">
                 <Lock className="h-4 w-4" />
@@ -495,107 +477,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               </div>
             </TabsContent>
 
-            {/* Notifications Settings */}
-            <TabsContent value="notifications" className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="notifications-toggle">
-                    Push Notifications
-                  </Label>
-                  <div className="text-sm text-muted-foreground">
-                    Receive notifications for activity on your posts
-                  </div>
-                </div>
-                <Switch
-                  id="notifications-toggle"
-                  checked={notificationsEnabled}
-                  onCheckedChange={setNotificationsEnabled}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Email Notification Preferences</Label>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="email-likes" className="text-sm">
-                      Likes on your posts
-                    </Label>
-                    <Switch id="email-likes" defaultChecked />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="email-comments" className="text-sm">
-                      Comments on your posts
-                    </Label>
-                    <Switch id="email-comments" defaultChecked />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="email-followers" className="text-sm">
-                      New followers
-                    </Label>
-                    <Switch id="email-followers" defaultChecked />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="email-messages" className="text-sm">
-                      Direct messages
-                    </Label>
-                    <Switch id="email-messages" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-4 flex justify-end items-center gap-3">
-                {saveSuccess.notifications && (
-                  <span className="text-sm text-green-500">
-                    Settings saved successfully!
-                  </span>
-                )}
-                <Button
-                  onClick={() => handleSaveSettings("notifications")}
-                  disabled={isSaving}
-                >
-                  {isSaving ? "Saving..." : "Save Changes"}
-                </Button>
-              </div>
-            </TabsContent>
-
             {/* Privacy Settings */}
             <TabsContent value="privacy" className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="profile-visibility">Profile Visibility</Label>
-                <Select
-                  value={privacySettings.profileVisibility}
-                  onValueChange={(value) =>
-                    setPrivacySettings({
-                      ...privacySettings,
-                      profileVisibility: value,
-                    })
-                  }
-                >
-                  <SelectTrigger id="profile-visibility">
-                    <SelectValue placeholder="Select visibility" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="public">Public</SelectItem>
-                    <SelectItem value="followers">Followers Only</SelectItem>
-                    <SelectItem value="private">Private</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="content-filter">Content Filter</Label>
-                <Select value={contentFilter} onValueChange={setContentFilter}>
-                  <SelectTrigger id="content-filter">
-                    <SelectValue placeholder="Select filter level" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="standard">Standard</SelectItem>
-                    <SelectItem value="strict">Strict</SelectItem>
-                    <SelectItem value="none">None</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label htmlFor="allow-tagging">Allow Tagging</Label>

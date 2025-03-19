@@ -757,15 +757,16 @@ export function Messages() {
     );
   }
 
+  // Change the main container from flex to grid layout for better control over scrolling
   return (
-    <div className="flex h-[calc(100vh-5rem)] flex-col rounded-lg border md:flex-row bg-gradient-to-br from-gray-950 to-gray-900 text-white overflow-hidden">
-      {/* Conversations list */}
-      <div className="w-full border-b md:w-80 md:border-b-0 md:border-r border-gray-800/50">
+    <div className="grid h-[calc(100vh-5rem)] grid-cols-1 md:grid-cols-[320px_1fr] rounded-lg border bg-gradient-to-br from-gray-950 to-gray-900 text-white overflow-hidden">
+      {/* Conversations list - with a fixed header and scrollable content */}
+      <div className="flex flex-col border-b md:border-b-0 md:border-r border-gray-800/50">
         <div className="p-4 border-b border-gray-800/50 bg-black/20">
           <h2 className="text-xl font-bold">Messages</h2>
         </div>
 
-        <div className="h-[calc(100vh-10rem)] overflow-y-auto">
+        <div className="overflow-y-auto flex-grow">
           <div className="space-y-0">
             {conversations.length === 0 ? (
               <div className="flex flex-col items-center justify-center p-6 text-center">
@@ -839,10 +840,10 @@ export function Messages() {
         </div>
       </div>
 
-      {/* Active conversation */}
+      {/* Active conversation - with fixed layout for header, messages area and input */}
       {activeConversation ? (
-        <div className="flex flex-1 flex-col">
-          <div className="flex items-center gap-3 border-b border-gray-800/50 p-4 bg-black/20">
+        <div className="flex flex-col h-full overflow-hidden">
+          <div className="flex-shrink-0 flex items-center gap-3 border-b border-gray-800/50 p-4 bg-black/20">
             <Link
               href={`/profile/${activeConversation.user.username}`}
               className="flex items-center gap-3 hover:opacity-90 transition-opacity"
@@ -868,7 +869,9 @@ export function Messages() {
                         new Date(
                           lastSeen[activeConversation.user.id.toString()]
                         ),
-                        { addSuffix: true }
+                        {
+                          addSuffix: true,
+                        }
                       )}`
                     : "Offline"}
                 </div>
@@ -879,9 +882,31 @@ export function Messages() {
           <div className="flex-1 overflow-y-auto p-4 bg-transparent">
             <div className="space-y-3 pb-2">
               {activeConversation.messages.map((message, index) => {
+                // Message rendering logic remains the same
+                // No changes needed here, just reinstating the existing code:
                 const isCurrentUser = message.senderId === user?.id;
                 const isLastMessage =
                   index === activeConversation.messages.length - 1;
+                const showAvatar =
+                  index === 0 ||
+                  activeConversation.messages[index - 1].senderId !==
+                    message.senderId ||
+                  new Date(message.timestamp).getTime() -
+                    new Date(
+                      activeConversation.messages[index - 1].timestamp
+                    ).getTime() >
+                    5 * 60 * 1000;
+
+                // Group messages by sender
+                const isFirstInGroup =
+                  index === 0 ||
+                  activeConversation.messages[index - 1].senderId !==
+                    message.senderId;
+
+                const isLastInGroup =
+                  index === activeConversation.messages.length - 1 ||
+                  activeConversation.messages[index + 1].senderId !==
+                    message.senderId;
 
                 return (
                   <div
@@ -894,119 +919,149 @@ export function Messages() {
                         : ""
                     }`}
                   >
-                    <div className={`max-w-[75%] flex flex-col`}>
-                      <div className="flex items-start gap-2">
-                        {!isCurrentUser && (
-                          <Avatar className="h-8 w-8 mt-1 flex-shrink-0">
-                            <AvatarImage
-                              src={activeConversation.user.profilePicture}
-                              alt={activeConversation.user.username}
-                            />
-                            <AvatarFallback>
-                              {activeConversation.user.username
-                                .charAt(0)
-                                .toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                        )}
+                    {!isCurrentUser && showAvatar ? (
+                      <Avatar className="h-8 w-8 mr-2 mt-auto mb-1 flex-shrink-0">
+                        <AvatarImage
+                          src={activeConversation.user.profilePicture}
+                          alt={activeConversation.user.username}
+                        />
+                        <AvatarFallback>
+                          {activeConversation.user.username
+                            .charAt(0)
+                            .toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                    ) : (
+                      !isCurrentUser && (
+                        <div className="w-10 flex-shrink-0"></div>
+                      )
+                    )}
 
-                        <div className="flex flex-col">
-                          {/* Reply reference */}
-                          {message.replyTo && renderReplyReference(message)}
+                    <div
+                      className={`max-w-[70%] flex flex-col ${
+                        isCurrentUser ? "items-end" : "items-start"
+                      }`}
+                    >
+                      {/* Show username only for the first message in a group */}
+                      {!isCurrentUser && isFirstInGroup && (
+                        <div className="mb-1 text-xs text-gray-400">
+                          {activeConversation.user.username}
+                        </div>
+                      )}
 
-                          <div
-                            className={`px-4 py-2 ${
-                              isCurrentUser
-                                ? "bg-indigo-600 text-white rounded-2xl rounded-tr-sm"
-                                : "bg-gray-800 text-white rounded-2xl rounded-tl-sm"
-                            } relative group`}
-                          >
-                            {/* Message text */}
-                            <div className="break-words">{message.text}</div>
+                      <div
+                        className={`flex flex-col ${
+                          isCurrentUser ? "items-end" : "items-start"
+                        }`}
+                      >
+                        {/* Reply reference */}
+                        {message.replyTo && renderReplyReference(message)}
 
-                            {/* Message image if present */}
-                            {message.image && (
-                              <div className="mt-2">
-                                <img
-                                  src={message.image || "/placeholder.svg"}
-                                  alt="Message attachment"
-                                  className="rounded-md max-h-60 object-cover cursor-pointer"
-                                  onClick={() =>
-                                    openImagePreview(message.image!)
-                                  }
-                                />
-                              </div>
-                            )}
+                        <div
+                          className={`px-4 py-2 ${
+                            isCurrentUser
+                              ? "bg-indigo-600 text-white"
+                              : "bg-gray-800 text-white"
+                          } relative group ${
+                            // Apply different border radius based on position in group
+                            isFirstInGroup && isLastInGroup
+                              ? "rounded-2xl"
+                              : isFirstInGroup
+                              ? isCurrentUser
+                                ? "rounded-2xl rounded-br-lg"
+                                : "rounded-2xl rounded-bl-lg"
+                              : isLastInGroup
+                              ? isCurrentUser
+                                ? "rounded-2xl rounded-tr-lg"
+                                : "rounded-2xl rounded-tl-lg"
+                              : isCurrentUser
+                              ? "rounded-2xl rounded-r-lg"
+                              : "rounded-2xl rounded-l-lg"
+                          }`}
+                        >
+                          {/* Message text */}
+                          <div className="break-words">{message.text}</div>
 
-                            {/* Shared post if present */}
-                            {message.sharedPost && renderSharedPost(message)}
+                          {/* Message image if present */}
+                          {message.image && (
+                            <div className="mt-2">
+                              <img
+                                src={message.image || "/placeholder.svg"}
+                                alt="Message attachment"
+                                className="rounded-md max-h-60 object-cover cursor-pointer"
+                                onClick={() => openImagePreview(message.image!)}
+                              />
+                            </div>
+                          )}
 
-                            {/* Message timestamp and actions */}
-                            <div className="mt-1 flex items-center justify-end gap-2 text-xs">
-                              <span
-                                className={
-                                  isCurrentUser
-                                    ? "text-white/80"
-                                    : "text-gray-400"
+                          {/* Shared post if present */}
+                          {message.sharedPost && renderSharedPost(message)}
+
+                          {/* Message timestamp and actions */}
+                          <div className="mt-1 flex items-center justify-end gap-2 text-xs">
+                            <span
+                              className={
+                                isCurrentUser
+                                  ? "text-white/80"
+                                  : "text-gray-400"
+                              }
+                            >
+                              {formatDistanceToNow(
+                                new Date(message.timestamp),
+                                {
+                                  addSuffix: true,
                                 }
+                              )}
+                            </span>
+
+                            {/* "Seen" receipt (previously "Read") */}
+                            {isCurrentUser &&
+                              userSettings.showReadReceipts &&
+                              message.read && (
+                                <span className="text-indigo-300 text-[10px] flex items-center ml-2">
+                                  <Check className="h-3 w-3 mr-0.5" />
+                                  Seen
+                                </span>
+                              )}
+
+                            {/* Actions that appear on hover */}
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-5 w-5 rounded-full hover:bg-gray-700"
+                                onClick={() => handleReplyToMessage(message)}
                               >
-                                {formatDistanceToNow(
-                                  new Date(message.timestamp),
-                                  {
-                                    addSuffix: true,
-                                  }
-                                )}
-                              </span>
+                                <Reply className="h-3 w-3" />
+                              </Button>
 
-                              {/* Read receipt */}
-                              {isCurrentUser &&
-                                userSettings.showReadReceipts &&
-                                message.read && (
-                                  <span className="text-indigo-300 text-[10px] flex items-center">
-                                    <Check className="h-3 w-3 mr-0.5" />
-                                    Read
-                                  </span>
-                                )}
-
-                              {/* Actions that appear on hover */}
-                              <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-5 w-5 rounded-full hover:bg-gray-700"
-                                  onClick={() => handleReplyToMessage(message)}
-                                >
-                                  <Reply className="h-3 w-3" />
-                                </Button>
-
-                                {isCurrentUser && (
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-5 w-5 rounded-full text-white hover:bg-indigo-700"
-                                      >
-                                        <MoreVertical className="h-3 w-3" />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent
-                                      align="end"
-                                      className="bg-gray-900 text-white border-gray-700"
+                              {isCurrentUser && (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-5 w-5 rounded-full text-white hover:bg-indigo-700"
                                     >
-                                      <DropdownMenuItem
-                                        onClick={() =>
-                                          handleDeleteMessage(message.id)
-                                        }
-                                        className="text-red-400 hover:bg-gray-800"
-                                      >
-                                        <Trash2 className="mr-2 h-4 w-4" />
-                                        Delete
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                )}
-                              </div>
+                                      <MoreVertical className="h-3 w-3" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent
+                                    align="end"
+                                    className="bg-gray-900 text-white border-gray-700"
+                                  >
+                                    <DropdownMenuItem
+                                      onClick={() =>
+                                        handleDeleteMessage(message.id)
+                                      }
+                                      className="text-red-400 hover:bg-gray-800"
+                                    >
+                                      <Trash2 className="mr-2 h-4 w-4" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -1021,7 +1076,7 @@ export function Messages() {
 
           {/* Reply indicator */}
           {replyingTo && (
-            <div className="px-4 py-2 border-t border-gray-800/50 flex items-center gap-2 bg-black/20">
+            <div className="flex-shrink-0 px-4 py-2 border-t border-gray-800/50 flex items-center gap-2 bg-black/20">
               <div className="flex-1 border-l-2 border-indigo-600 pl-2 py-1">
                 <div className="flex items-center gap-1">
                   <Reply className="h-4 w-4 text-gray-400" />
@@ -1049,7 +1104,7 @@ export function Messages() {
 
           {/* Message input with image preview */}
           {messageImage && (
-            <div className="px-4 py-2 border-t border-gray-800/50 bg-black/20">
+            <div className="flex-shrink-0 px-4 py-2 border-t border-gray-800/50 bg-black/20">
               <div className="relative inline-block">
                 <img
                   src={messageImage || "/placeholder.svg"}
@@ -1070,7 +1125,7 @@ export function Messages() {
 
           <form
             onSubmit={handleSendMessage}
-            className="flex gap-2 border-t border-gray-800/50 p-4 bg-black/20"
+            className="flex-shrink-0 flex gap-2 border-t border-gray-800/50 p-4 bg-black/20"
           >
             <div className="relative flex-1">
               <Input
