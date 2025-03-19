@@ -1,21 +1,21 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { getHashtagPosts } from "@/lib/data"
-import type { Post as PostType } from "@/lib/types"
-import { Post } from "@/components/post"
-import { Hash } from "lucide-react"
+import { useState } from "react";
+import { getHashtagPosts } from "@/lib/data";
+import type { Post as PostType } from "@/lib/types";
+import { Post } from "@/components/post";
+import { Hash } from "lucide-react";
 
 interface HashtagPageProps {
-  tag: string
+  tag: string;
 }
 
 export function HashtagPage({ tag }: HashtagPageProps) {
-  const [posts, setPosts] = useState<PostType[]>(getHashtagPosts(tag))
+  const [posts, setPosts] = useState<PostType[]>(getHashtagPosts(tag));
 
   const handleDeletePost = (postId: string) => {
-    setPosts(posts.filter((post) => post.id !== postId))
-  }
+    setPosts(posts.filter((post) => post.id !== postId));
+  };
 
   const handleLikePost = (postId: string) => {
     setPosts(
@@ -25,26 +25,43 @@ export function HashtagPage({ tag }: HashtagPageProps) {
             ...post,
             isLiked: !post.isLiked,
             likes: post.isLiked ? post.likes - 1 : post.likes + 1,
-          }
+          };
         }
-        return post
-      }),
-    )
-  }
+        return post;
+      })
+    );
+  };
 
-  const handleAddComment = (postId: string, comment: { id: string; user: string; text: string }) => {
+  const handleAddComment = (
+    postId: string,
+    comment: {
+      id: string;
+      user: string;
+      text: string;
+      isRefreshTrigger?: boolean;
+    }
+  ) => {
+    // If this is just a refresh trigger, don't make an API call
+    if (comment.isRefreshTrigger) {
+      // Create a new posts array to force a re-render
+      setPosts((currentPosts) =>
+        currentPosts.map((post) => (post.id === postId ? { ...post } : post))
+      );
+      return;
+    }
+
     setPosts(
       posts.map((post) => {
         if (post.id === postId) {
           return {
             ...post,
             comments: [...post.comments, comment],
-          }
+          };
         }
-        return post
-      }),
-    )
-  }
+        return post;
+      })
+    );
+  };
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -56,7 +73,9 @@ export function HashtagPage({ tag }: HashtagPageProps) {
       {posts.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-12 text-center">
           <h3 className="text-lg font-medium">No memes with #{tag}</h3>
-          <p className="text-muted-foreground">Be the first to post a meme with this hashtag!</p>
+          <p className="text-muted-foreground">
+            Be the first to post a meme with this hashtag!
+          </p>
         </div>
       ) : (
         <div className="space-y-6 mt-6">
@@ -72,6 +91,5 @@ export function HashtagPage({ tag }: HashtagPageProps) {
         </div>
       )}
     </div>
-  )
+  );
 }
-
