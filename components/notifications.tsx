@@ -1,7 +1,5 @@
 "use client"
 
-// Update the Notifications component to handle pagination and optimize rendering
-
 import { useRef, useState, useEffect } from "react"
 import { formatDistanceToNow } from "date-fns"
 import { useRouter } from "next/navigation"
@@ -14,6 +12,7 @@ import { Heart, MessageCircle, UserPlus, RefreshCw } from "lucide-react"
 import axios from "axios"
 import io from "socket.io-client"
 import { useAuth } from "@/components/auth-provider"
+import { toast } from "@/hooks/use-toast"
 
 // Initialize socket connection
 let socket: any
@@ -29,6 +28,8 @@ export function Notifications() {
   const [error, setError] = useState<string | null>(null)
   const socketInitialized = useRef(false)
   const ITEMS_PER_PAGE = 20
+  const retryCount = useRef(0)
+  const maxRetries = 3
 
   // Initialize socket connection
   useEffect(() => {
@@ -62,12 +63,12 @@ export function Notifications() {
 
         socket.on("connect_error", (error) => {
           console.error("Socket connection error:", error)
-          setError(`Socket connection error: ${error.message}`)
+          // Don't set error state for socket connection issues
+          // as it's not critical for the notifications page to work
         })
 
         socket.on("error", (error) => {
           console.error("Socket error:", error)
-          setError(`Socket error: ${error.message || "Unknown error"}`)
         })
 
         socket.on("newNotification", (notification: Notification) => {
@@ -85,12 +86,12 @@ export function Notifications() {
         }
       } catch (err) {
         console.error("Error setting up socket:", err)
-        setError(`Failed to initialize notifications: ${err.message}`)
+        // Don't block the UI for socket errors
       }
     }
   }, [user])
 
-  // Fetch notifications with pagination
+  // Fetch notifications with pagination and retry logic
   const fetchNotifications = async (pageNum = 1, append = false) => {
     try {
       setLoading(pageNum === 1)
@@ -104,10 +105,13 @@ export function Notifications() {
       })
 
       if (data.success) {
+        // Reset retry count on success
+        retryCount.current = 0
+
         if (append) {
           setNotifications((prev) => [...prev, ...data.data])
         } else {
-          setNotifications(data.data)
+          setNotifications(data.data || [])
         }
 
         // Check if there are more notifications to load
@@ -122,7 +126,7 @@ export function Notifications() {
       if (error.response) {
         // The request was made and the server responded with a status code
         // that falls out of the range of 2xx
-        errorMessage = `Server error: ${error.response.status} - ${error.response.data.message || error.message}`
+        errorMessage = `Server error: ${error.response.status} - ${error.response.data?.message || error.message}`
         console.error("Response data:", error.response.data)
       } else if (error.request) {
         // The request was made but no response was received
@@ -130,6 +134,21 @@ export function Notifications() {
       }
 
       setError(errorMessage)
+
+      // Auto-retry logic for network errors
+      if (retryCount.current < maxRetries) {
+        retryCount.current++
+        const delay = retryCount.current * 2000 // Exponential backoff
+        toast({
+          title: "Connection issue",
+          description: `Retrying in ${delay / 1000} seconds... (${retryCount.current}/${maxRetries})`,
+          variant: "destructive",
+        })
+
+        setTimeout(() => {
+          fetchNotifications(pageNum, append)
+        }, delay)
+      }
     } finally {
       setLoading(false)
       setLoadingMore(false)
@@ -168,6 +187,11 @@ export function Notifications() {
       )
     } catch (error) {
       console.error("Error marking all notifications as read:", error)
+      toast({
+        title: "Error",
+        description: "Failed to mark notifications as read",
+        variant: "destructive",
+      })
     }
   }
 
