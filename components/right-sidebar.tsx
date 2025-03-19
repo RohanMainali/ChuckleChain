@@ -484,8 +484,9 @@ export function RightSidebar() {
                         </div>
                       </TooltipTrigger>
                       <TooltipContent
-                        side="bottom"
-                        className="max-w-[200px] animate-fade-in"
+                        side="right"
+                        align="center"
+                        className="max-w-[200px] animate-fade-in z-50"
                       >
                         <div className="text-sm font-semibold">
                           {badge.name}
@@ -583,6 +584,25 @@ export function RightSidebar() {
                         Get featured in top memes of the week
                       </div>
                     )}
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="link" className="p-0 text-xs">
+                            Learn More
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent
+                          side="right"
+                          align="center"
+                          className="max-w-[200px] animate-fade-in z-50"
+                        >
+                          <div className="text-sm font-semibold">
+                            {badge.name}
+                          </div>
+                          <div className="text-xs">{badge.longDescription}</div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
                 );
               })}

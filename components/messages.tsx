@@ -12,11 +12,11 @@ import {
   Trash2,
   Reply,
   X,
+  Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Conversation, Message as MessageType } from "@/lib/types";
 import { useAuth } from "@/components/auth-provider";
 import axios from "axios";
@@ -36,6 +36,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 
 // Initialize socket connection
 let socket: any;
@@ -55,6 +56,10 @@ export function Messages() {
   const [replyingTo, setReplyingTo] = useState<MessageType | null>(null);
   const [imagePreviewOpen, setImagePreviewOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [unreadConversations, setUnreadConversations] = useState<Set<string>>(
+    new Set()
+  );
+  const [newMessageAnimation, setNewMessageAnimation] = useState(false);
 
   // Add these state variables after the existing ones:
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
@@ -95,6 +100,11 @@ export function Messages() {
         reconnectionDelay: 1000,
       });
 
+      // Store socket in window for global access
+      if (typeof window !== "undefined") {
+        (window as any).socket = socket;
+      }
+
       // Debug socket connection
       socket.on("connect", () => {
         console.log("Socket connected successfully with ID:", socket.id);
@@ -128,6 +138,18 @@ export function Messages() {
               timestamp: message.timestamp,
             };
 
+            // If this is not the active conversation or the message is not from the current user,
+            // mark the conversation as unread
+            if (
+              (!activeConversation ||
+                activeConversation.id !== message.conversationId) &&
+              message.senderId !== user?.id
+            ) {
+              setUnreadConversations((prev) =>
+                new Set(prev).add(message.conversationId)
+              );
+            }
+
             // Move this conversation to the top of the list
             updatedConversations.splice(existingConvIndex, 1);
             updatedConversations.unshift(conversation);
@@ -143,6 +165,11 @@ export function Messages() {
         // If the active conversation is the one receiving the message, update it
         setActiveConversation((prev) => {
           if (!prev || prev.id !== message.conversationId) return prev;
+
+          // Trigger the new message animation
+          setNewMessageAnimation(true);
+          setTimeout(() => setNewMessageAnimation(false), 500);
+
           return {
             ...prev,
             messages: [...prev.messages, message],
@@ -304,9 +331,23 @@ export function Messages() {
       const { data } = await axios.get("/api/messages/conversations");
       if (data.success) {
         setConversations(data.data);
+
+        // Identify unread conversations
+        const unread = new Set<string>();
+        data.data.forEach((conv: Conversation) => {
+          const hasUnreadMessages = conv.messages.some(
+            (msg) => !msg.read && msg.senderId !== user?.id
+          );
+          if (hasUnreadMessages) {
+            unread.add(conv.id);
+          }
+        });
+        setUnreadConversations(unread);
+
         // Set the first conversation as active if there is one and no active conversation
         if (data.data.length > 0 && !activeConversation) {
-          setActiveConversation(data.data[0]);
+          // Don't automatically set active conversation - wait for user to click
+          // setActiveConversation(data.data[0])
         }
       }
     } catch (error) {
@@ -351,6 +392,13 @@ export function Messages() {
   // Mark messages as read when viewing a conversation
   useEffect(() => {
     if (activeConversation) {
+      // Remove from unread conversations
+      setUnreadConversations((prev) => {
+        const updated = new Set(prev);
+        updated.delete(activeConversation.id);
+        return updated;
+      });
+
       // Check if there are any unread messages from the other user
       const hasUnreadMessages = activeConversation.messages.some(
         (msg) => !msg.read && msg.senderId !== user?.id
@@ -401,9 +449,11 @@ export function Messages() {
     }
   }, [activeConversation, user?.id]);
 
-  // Scroll to bottom when new messages are added
+  // Scroll to bottom when new messages are added, but use a fade-in animation instead
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "auto" });
+    }
   }, [activeConversation?.messages]);
 
   // Update the handleSendMessage function to ensure images are properly stored
@@ -456,7 +506,7 @@ export function Messages() {
 
       // Update the conversations list
       setConversations((prevConversations) => {
-        return prevConversations.map((conv) => {
+        const updatedConversations = prevConversations.map((conv) => {
           if (conv.id === activeConversation.id) {
             return {
               ...conv,
@@ -469,6 +519,17 @@ export function Messages() {
           }
           return conv;
         });
+
+        // Move the active conversation to the top
+        const activeConvIndex = updatedConversations.findIndex(
+          (conv) => conv.id === activeConversation.id
+        );
+        if (activeConvIndex > 0) {
+          const [activeConv] = updatedConversations.splice(activeConvIndex, 1);
+          updatedConversations.unshift(activeConv);
+        }
+
+        return updatedConversations;
       });
 
       // Clear the input and reset states
@@ -655,12 +716,12 @@ export function Messages() {
       repliedMessage.senderId === user?.id;
 
     return (
-      <div className="mb-2">
+      <div className="mb-1">
         <div
           className={`px-3 py-2 rounded-lg mb-1 max-w-[250px] overflow-hidden ${
             isRepliedMessageFromCurrentUser
-              ? "bg-purple-600/30 border-l-4 border-purple-600"
-              : "bg-gray-800/50 border-l-4 border-gray-600"
+              ? "bg-indigo-600/20 border-l-2 border-indigo-600"
+              : "bg-gray-800/30 border-l-2 border-gray-600"
           }`}
         >
           <div className="flex items-center gap-1 mb-1">
@@ -697,14 +758,14 @@ export function Messages() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-5rem)] flex-col rounded-lg border md:flex-row bg-black text-white">
+    <div className="flex h-[calc(100vh-5rem)] flex-col rounded-lg border md:flex-row bg-gradient-to-br from-gray-950 to-gray-900 text-white overflow-hidden">
       {/* Conversations list */}
-      <div className="w-full border-b md:w-80 md:border-b-0 md:border-r border-gray-800">
-        <div className="p-4 border-b border-gray-800">
-          <h2 className="text-2xl font-bold">Messages</h2>
+      <div className="w-full border-b md:w-80 md:border-b-0 md:border-r border-gray-800/50">
+        <div className="p-4 border-b border-gray-800/50 bg-black/20">
+          <h2 className="text-xl font-bold">Messages</h2>
         </div>
 
-        <ScrollArea className="h-[calc(100vh-10rem)]">
+        <div className="h-[calc(100vh-10rem)] overflow-y-auto">
           <div className="space-y-0">
             {conversations.length === 0 ? (
               <div className="flex flex-col items-center justify-center p-6 text-center">
@@ -713,21 +774,25 @@ export function Messages() {
             ) : (
               conversations.map((conversation) => {
                 // Check if there are unread messages in this conversation
-                const hasUnreadMessages = conversation.messages.some(
-                  (msg) => !msg.read && msg.senderId !== user?.id
+                const hasUnreadMessages = unreadConversations.has(
+                  conversation.id
                 );
                 const isActive = activeConversation?.id === conversation.id;
 
                 return (
                   <button
                     key={conversation.id}
-                    className={`flex w-full items-center gap-3 p-4 text-left transition-all duration-300 hover:bg-gray-800 border-b border-gray-800 ${
-                      isActive ? "bg-gray-800" : ""
-                    }`}
+                    className={`flex w-full items-center gap-3 p-4 text-left transition-all duration-300 hover:bg-black/20 border-b border-gray-800/30 ${
+                      isActive ? "bg-black/30" : ""
+                    } ${hasUnreadMessages ? "bg-black/10" : ""}`}
                     onClick={() => setActiveConversation(conversation)}
                   >
                     <div className="relative">
-                      <Avatar className="h-12 w-12">
+                      <Avatar
+                        className={`h-12 w-12 ${
+                          hasUnreadMessages ? "ring-2 ring-indigo-500" : ""
+                        }`}
+                      >
                         <AvatarImage
                           src={conversation.user.profilePicture}
                           alt={conversation.user.username}
@@ -737,20 +802,28 @@ export function Messages() {
                         </AvatarFallback>
                       </Avatar>
                       {onlineUsers.has(conversation.user.id.toString()) && (
-                        <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-gray-800"></span>
+                        <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-gray-900"></span>
                       )}
                     </div>
                     <div className="flex-1 overflow-hidden">
                       <div
                         className={`font-medium text-lg ${
-                          hasUnreadMessages && !isActive ? "font-bold" : ""
+                          hasUnreadMessages ? "font-bold text-white" : ""
                         }`}
                       >
                         {conversation.user.username}
+                        {hasUnreadMessages && (
+                          <Badge
+                            variant="default"
+                            className="ml-2 bg-indigo-600 text-xs"
+                          >
+                            New
+                          </Badge>
+                        )}
                       </div>
                       <div
                         className={`truncate text-sm ${
-                          hasUnreadMessages && !isActive
+                          hasUnreadMessages
                             ? "font-semibold text-white"
                             : "text-gray-400"
                         }`}
@@ -763,13 +836,13 @@ export function Messages() {
               })
             )}
           </div>
-        </ScrollArea>
+        </div>
       </div>
 
       {/* Active conversation */}
       {activeConversation ? (
         <div className="flex flex-1 flex-col">
-          <div className="flex items-center gap-3 border-b border-gray-800 p-4 bg-gray-900">
+          <div className="flex items-center gap-3 border-b border-gray-800/50 p-4 bg-black/20">
             <Link
               href={`/profile/${activeConversation.user.username}`}
               className="flex items-center gap-3 hover:opacity-90 transition-opacity"
@@ -803,110 +876,138 @@ export function Messages() {
             </Link>
           </div>
 
-          <ScrollArea className="flex-1 p-4 bg-black">
-            <div className="space-y-4">
+          <div className="flex-1 overflow-y-auto p-4 bg-transparent">
+            <div className="space-y-3 pb-2">
               {activeConversation.messages.map((message, index) => {
                 const isCurrentUser = message.senderId === user?.id;
+                const isLastMessage =
+                  index === activeConversation.messages.length - 1;
 
                 return (
                   <div
                     key={message.id}
                     className={`flex ${
                       isCurrentUser ? "justify-end" : "justify-start"
+                    } ${
+                      isLastMessage && newMessageAnimation
+                        ? "animate-pulse"
+                        : ""
                     }`}
                   >
-                    <div
-                      className={`max-w-[70%] ${
-                        isCurrentUser ? "items-end" : "items-start"
-                      } flex flex-col`}
-                    >
-                      {/* Reply reference */}
-                      {message.replyTo && renderReplyReference(message)}
-
-                      <div
-                        className={`rounded-lg px-4 py-2 ${
-                          isCurrentUser
-                            ? "bg-purple-600 text-white"
-                            : "bg-gray-800 text-white"
-                        } relative group`}
-                      >
-                        {/* Message text */}
-                        <div>{message.text}</div>
-
-                        {/* Message image if present */}
-                        {message.image && (
-                          <div className="mt-2">
-                            <img
-                              src={message.image || "/placeholder.svg"}
-                              alt="Message attachment"
-                              className="rounded-md max-h-60 object-cover cursor-pointer"
-                              onClick={() => openImagePreview(message.image!)}
+                    <div className={`max-w-[75%] flex flex-col`}>
+                      <div className="flex items-start gap-2">
+                        {!isCurrentUser && (
+                          <Avatar className="h-8 w-8 mt-1 flex-shrink-0">
+                            <AvatarImage
+                              src={activeConversation.user.profilePicture}
+                              alt={activeConversation.user.username}
                             />
-                          </div>
+                            <AvatarFallback>
+                              {activeConversation.user.username
+                                .charAt(0)
+                                .toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
                         )}
 
-                        {/* Shared post if present */}
-                        {message.sharedPost && renderSharedPost(message)}
+                        <div className="flex flex-col">
+                          {/* Reply reference */}
+                          {message.replyTo && renderReplyReference(message)}
 
-                        {/* Message timestamp and actions */}
-                        <div className="mt-1 flex items-center justify-end gap-2 text-xs">
-                          <span
-                            className={
-                              isCurrentUser ? "text-white/80" : "text-gray-400"
-                            }
+                          <div
+                            className={`px-4 py-2 ${
+                              isCurrentUser
+                                ? "bg-indigo-600 text-white rounded-2xl rounded-tr-sm"
+                                : "bg-gray-800 text-white rounded-2xl rounded-tl-sm"
+                            } relative group`}
                           >
-                            {formatDistanceToNow(new Date(message.timestamp), {
-                              addSuffix: true,
-                            })}
-                          </span>
+                            {/* Message text */}
+                            <div className="break-words">{message.text}</div>
 
-                          {/* Read receipt */}
-                          {isCurrentUser &&
-                            userSettings.showReadReceipts &&
-                            message.read && (
-                              <span className="text-blue-400 text-[10px]">
-                                Read
+                            {/* Message image if present */}
+                            {message.image && (
+                              <div className="mt-2">
+                                <img
+                                  src={message.image || "/placeholder.svg"}
+                                  alt="Message attachment"
+                                  className="rounded-md max-h-60 object-cover cursor-pointer"
+                                  onClick={() =>
+                                    openImagePreview(message.image!)
+                                  }
+                                />
+                              </div>
+                            )}
+
+                            {/* Shared post if present */}
+                            {message.sharedPost && renderSharedPost(message)}
+
+                            {/* Message timestamp and actions */}
+                            <div className="mt-1 flex items-center justify-end gap-2 text-xs">
+                              <span
+                                className={
+                                  isCurrentUser
+                                    ? "text-white/80"
+                                    : "text-gray-400"
+                                }
+                              >
+                                {formatDistanceToNow(
+                                  new Date(message.timestamp),
+                                  {
+                                    addSuffix: true,
+                                  }
+                                )}
                               </span>
-                            )}
 
-                          {/* Actions that appear on hover */}
-                          <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-5 w-5 rounded-full hover:bg-gray-700"
-                              onClick={() => handleReplyToMessage(message)}
-                            >
-                              <Reply className="h-3 w-3" />
-                            </Button>
+                              {/* Read receipt */}
+                              {isCurrentUser &&
+                                userSettings.showReadReceipts &&
+                                message.read && (
+                                  <span className="text-indigo-300 text-[10px] flex items-center">
+                                    <Check className="h-3 w-3 mr-0.5" />
+                                    Read
+                                  </span>
+                                )}
 
-                            {isCurrentUser && (
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-5 w-5 rounded-full text-white hover:bg-purple-700"
-                                  >
-                                    <MoreVertical className="h-3 w-3" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent
-                                  align="end"
-                                  className="bg-gray-900 text-white border-gray-700"
+                              {/* Actions that appear on hover */}
+                              <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-5 w-5 rounded-full hover:bg-gray-700"
+                                  onClick={() => handleReplyToMessage(message)}
                                 >
-                                  <DropdownMenuItem
-                                    onClick={() =>
-                                      handleDeleteMessage(message.id)
-                                    }
-                                    className="text-red-400 hover:bg-gray-800"
-                                  >
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Delete
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            )}
+                                  <Reply className="h-3 w-3" />
+                                </Button>
+
+                                {isCurrentUser && (
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-5 w-5 rounded-full text-white hover:bg-indigo-700"
+                                      >
+                                        <MoreVertical className="h-3 w-3" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent
+                                      align="end"
+                                      className="bg-gray-900 text-white border-gray-700"
+                                    >
+                                      <DropdownMenuItem
+                                        onClick={() =>
+                                          handleDeleteMessage(message.id)
+                                        }
+                                        className="text-red-400 hover:bg-gray-800"
+                                      >
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        Delete
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                )}
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -916,12 +1017,12 @@ export function Messages() {
               })}
               <div ref={messagesEndRef} />
             </div>
-          </ScrollArea>
+          </div>
 
           {/* Reply indicator */}
           {replyingTo && (
-            <div className="px-4 py-2 border-t border-gray-800 flex items-center gap-2 bg-gray-900">
-              <div className="flex-1 border-l-4 border-purple-600 pl-2 py-1">
+            <div className="px-4 py-2 border-t border-gray-800/50 flex items-center gap-2 bg-black/20">
+              <div className="flex-1 border-l-2 border-indigo-600 pl-2 py-1">
                 <div className="flex items-center gap-1">
                   <Reply className="h-4 w-4 text-gray-400" />
                   <div className="text-xs text-gray-400">
@@ -948,7 +1049,7 @@ export function Messages() {
 
           {/* Message input with image preview */}
           {messageImage && (
-            <div className="px-4 py-2 border-t border-gray-800 bg-gray-900">
+            <div className="px-4 py-2 border-t border-gray-800/50 bg-black/20">
               <div className="relative inline-block">
                 <img
                   src={messageImage || "/placeholder.svg"}
@@ -969,14 +1070,14 @@ export function Messages() {
 
           <form
             onSubmit={handleSendMessage}
-            className="flex gap-2 border-t border-gray-800 p-4 bg-gray-900"
+            className="flex gap-2 border-t border-gray-800/50 p-4 bg-black/20"
           >
             <div className="relative flex-1">
               <Input
                 placeholder="Type a message..."
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
-                className="pr-10 bg-gray-800 border-gray-700 text-white placeholder:text-gray-400 focus-visible:ring-purple-600"
+                className="pr-10 bg-gray-800/50 border-gray-700/50 text-white placeholder:text-gray-400 focus-visible:ring-indigo-600 rounded-full"
                 disabled={isUploading}
               />
               <input
@@ -1001,7 +1102,7 @@ export function Messages() {
               type="submit"
               size="icon"
               disabled={(!newMessage.trim() && !messageImage) || isUploading}
-              className="bg-purple-600 hover:bg-purple-700 transition-all duration-300 hover:scale-110"
+              className="bg-indigo-600 hover:bg-indigo-700 transition-all duration-300 hover:scale-110 rounded-full"
             >
               {isUploading ? (
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
@@ -1012,7 +1113,7 @@ export function Messages() {
           </form>
         </div>
       ) : (
-        <div className="flex flex-1 flex-col items-center justify-center p-4 text-center bg-black">
+        <div className="flex flex-1 flex-col items-center justify-center p-4 text-center bg-transparent">
           <h3 className="text-lg font-medium">No conversation selected</h3>
           <p className="text-gray-400">
             Select a conversation from the list to start chatting
