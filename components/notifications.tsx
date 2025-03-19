@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef } from "react";
+// Update the Notifications component to handle pagination and optimize rendering
 
-import { useState, useEffect } from "react";
+import { useRef, useState, useEffect } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { useRouter } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Notification } from "@/lib/types";
-import { Heart, MessageCircle, UserPlus } from "lucide-react";
+import { Heart, MessageCircle, UserPlus, RefreshCw } from "lucide-react";
 import axios from "axios";
 import io from "socket.io-client";
 import { useAuth } from "@/components/auth-provider";
@@ -23,17 +23,21 @@ export function Notifications() {
   const router = useRouter();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(1);
+  const [error, setError] = useState<string | null>(null);
   const socketInitialized = useRef(false);
+  const ITEMS_PER_PAGE = 20;
 
   // Initialize socket connection
-  // Add debugging to the socket connection:
   useEffect(() => {
     if (user && !socketInitialized.current) {
       console.log("Initializing socket connection for notifications");
 
       // Connect to the socket server with auth token
       const token = document.cookie.split("token=")[1]?.split(";")[0];
-      socket = io("http://localhost:5001", {
+      socket = io(process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001", {
         withCredentials: true,
         auth: { token },
       });
@@ -68,26 +72,57 @@ export function Notifications() {
     }
   }, [user]);
 
-  // Fetch notifications
-  useEffect(() => {
-    const fetchNotifications = async () => {
-      try {
-        setLoading(true);
-        const { data } = await axios.get("/api/notifications");
-        if (data.success) {
+  // Fetch notifications with pagination
+  const fetchNotifications = async (pageNum = 1, append = false) => {
+    try {
+      setLoading(pageNum === 1);
+      setLoadingMore(pageNum > 1);
+      setError(null);
+
+      const { data } = await axios.get(
+        `/api/notifications?page=${pageNum}&limit=${ITEMS_PER_PAGE}`
+      );
+
+      if (data.success) {
+        if (append) {
+          setNotifications((prev) => [...prev, ...data.data]);
+        } else {
           setNotifications(data.data);
         }
-      } catch (error) {
-        console.error("Error fetching notifications:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
 
+        // Check if there are more notifications to load
+        setHasMore(data.data.length === ITEMS_PER_PAGE);
+      } else {
+        setError("Failed to load notifications");
+      }
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+      setError("An error occurred while loading notifications");
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  // Initial fetch
+  useEffect(() => {
     if (user) {
       fetchNotifications();
     }
   }, [user]);
+
+  const handleLoadMore = () => {
+    if (!loadingMore && hasMore) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      fetchNotifications(nextPage, true);
+    }
+  };
+
+  const handleRefresh = () => {
+    setPage(1);
+    fetchNotifications(1, false);
+  };
 
   const handleMarkAllAsRead = async () => {
     try {
@@ -184,7 +219,7 @@ export function Notifications() {
     }
   };
 
-  if (loading) {
+  if (loading && page === 1) {
     return (
       <div className="mx-auto max-w-2xl">
         <div className="flex justify-center py-12">
@@ -198,12 +233,32 @@ export function Notifications() {
     <div className="mx-auto max-w-2xl">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Notifications</h1>
-        {notifications.length > 0 && (
-          <Button variant="outline" size="sm" onClick={handleMarkAllAsRead}>
-            Mark all as read
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handleRefresh}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
           </Button>
-        )}
+          {notifications.length > 0 && (
+            <Button variant="outline" size="sm" onClick={handleMarkAllAsRead}>
+              Mark all as read
+            </Button>
+          )}
+        </div>
       </div>
+
+      {error && (
+        <div className="bg-destructive/10 text-destructive p-4 rounded-md mb-4">
+          {error}
+          <Button
+            variant="outline"
+            size="sm"
+            className="ml-2"
+            onClick={handleRefresh}
+          >
+            Try Again
+          </Button>
+        </div>
+      )}
 
       <Card>
         <ScrollArea className="h-[calc(100vh-12rem)]">
@@ -223,7 +278,7 @@ export function Notifications() {
                     className={`flex items-start gap-4 p-4 hover:bg-muted/50 cursor-pointer animate-slide-up ${
                       !notification.read ? "bg-muted/30" : ""
                     }`}
-                    style={{ animationDelay: `${index * 0.05}s` }}
+                    style={{ animationDelay: `${Math.min(index, 10) * 0.05}s` }}
                     onClick={() => handleNotificationClick(notification)}
                   >
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
@@ -241,7 +296,9 @@ export function Notifications() {
                             {notification.user.username.charAt(0).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
-                        <p>{getNotificationText(notification)}</p>
+                        <p className="break-words">
+                          {getNotificationText(notification)}
+                        </p>
                       </div>
 
                       <div className="mt-1 text-xs text-muted-foreground">
@@ -265,6 +322,26 @@ export function Notifications() {
                     )}
                   </div>
                 ))}
+
+                {hasMore && (
+                  <div className="p-4 flex justify-center">
+                    <Button
+                      variant="outline"
+                      onClick={handleLoadMore}
+                      disabled={loadingMore}
+                      className="w-full"
+                    >
+                      {loadingMore ? (
+                        <>
+                          <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+                          Loading more...
+                        </>
+                      ) : (
+                        "Load More"
+                      )}
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </CardContent>
