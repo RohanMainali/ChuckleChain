@@ -1,5 +1,5 @@
-const Notification = require("../models/Notification")
-const User = require("../models/User")
+const Notification = require("../models/Notification");
+const User = require("../models/User");
 
 // @desc    Get all notifications for the current user
 // @route   GET /api/notifications
@@ -15,7 +15,7 @@ exports.getNotifications = async (req, res) => {
       .populate({
         path: "post",
         select: "text",
-      })
+      });
 
     res.status(200).json({
       success: true,
@@ -33,27 +33,27 @@ exports.getNotifications = async (req, res) => {
         read: notification.read,
         timestamp: notification.createdAt,
       })),
-    })
+    });
   } catch (error) {
     res.status(500).json({
       success: false,
       message: error.message,
-    })
+    });
   }
-}
+};
 
 // @desc    Mark notification as read
 // @route   PUT /api/notifications/:id/read
 // @access  Private
 exports.markAsRead = async (req, res) => {
   try {
-    const notification = await Notification.findById(req.params.id)
+    const notification = await Notification.findById(req.params.id);
 
     if (!notification) {
       return res.status(404).json({
         success: false,
         message: "Notification not found",
-      })
+      });
     }
 
     // Make sure notification belongs to current user
@@ -61,11 +61,11 @@ exports.markAsRead = async (req, res) => {
       return res.status(401).json({
         success: false,
         message: "Not authorized to update this notification",
-      })
+      });
     }
 
-    notification.read = true
-    await notification.save()
+    notification.read = true;
+    await notification.save();
 
     res.status(200).json({
       success: true,
@@ -73,46 +73,49 @@ exports.markAsRead = async (req, res) => {
         id: notification._id,
         read: notification.read,
       },
-    })
+    });
   } catch (error) {
     res.status(500).json({
       success: false,
       message: error.message,
-    })
+    });
   }
-}
+};
 
 // @desc    Mark all notifications as read
 // @route   PUT /api/notifications/read-all
 // @access  Private
 exports.markAllAsRead = async (req, res) => {
   try {
-    await Notification.updateMany({ recipient: req.user.id, read: false }, { read: true })
+    await Notification.updateMany(
+      { recipient: req.user.id, read: false },
+      { read: true }
+    );
 
     res.status(200).json({
       success: true,
       data: {},
-    })
+    });
   } catch (error) {
     res.status(500).json({
       success: false,
       message: error.message,
-    })
+    });
   }
-}
+};
 
 // @desc    Delete a notification
 // @route   DELETE /api/notifications/:id
 // @access  Private
 exports.deleteNotification = async (req, res) => {
   try {
-    const notification = await Notification.findById(req.params.id)
+    const notification = await Notification.findById(req.params.id);
 
     if (!notification) {
       return res.status(404).json({
         success: false,
         message: "Notification not found",
-      })
+      });
     }
 
     // Make sure notification belongs to current user
@@ -120,22 +123,22 @@ exports.deleteNotification = async (req, res) => {
       return res.status(401).json({
         success: false,
         message: "Not authorized to delete this notification",
-      })
+      });
     }
 
-    await notification.deleteOne()
+    await notification.deleteOne();
 
     res.status(200).json({
       success: true,
       data: {},
-    })
+    });
   } catch (error) {
     res.status(500).json({
       success: false,
       message: error.message,
-    })
+    });
   }
-}
+};
 
 // @desc    Get unread notification count
 // @route   GET /api/notifications/count
@@ -145,17 +148,16 @@ exports.getUnreadCount = async (req, res) => {
     const count = await Notification.countDocuments({
       recipient: req.user.id,
       read: false,
-    })
+    });
 
     res.status(200).json({
       success: true,
       data: { count },
-    })
+    });
   } catch (error) {
     res.status(500).json({
       success: false,
       message: error.message,
-    })
+    });
   }
-}
-
+};

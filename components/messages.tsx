@@ -56,6 +56,15 @@ export function Messages() {
   const [imagePreviewOpen, setImagePreviewOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
+  // Add these state variables after the existing ones:
+  const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
+  const [lastSeen, setLastSeen] = useState<Record<string, Date>>({});
+  const [showReadReceipts, setShowReadReceipts] = useState(true);
+  const [userSettings, setUserSettings] = useState({
+    showOnlineStatus: true,
+    showReadReceipts: true,
+  });
+
   // Initialize router at the beginning of the component
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -89,6 +98,7 @@ export function Messages() {
       // Debug socket connection
       socket.on("connect", () => {
         console.log("Socket connected successfully with ID:", socket.id);
+        socket.emit("getOnlineUsers");
       });
 
       socket.on("connect_error", (error) => {
@@ -171,6 +181,74 @@ export function Messages() {
         });
       });
 
+      socket.on("onlineUsers", (users: string[]) => {
+        console.log("Online users update received:", users);
+        setOnlineUsers(new Set(users));
+      });
+
+      socket.on("userConnected", (userId: string) => {
+        console.log("User connected:", userId);
+        setOnlineUsers((prev) => {
+          const updated = new Set(prev);
+          updated.add(userId);
+          return updated;
+        });
+      });
+
+      socket.on("userDisconnected", (userId: string, lastActive: string) => {
+        console.log("User disconnected:", userId);
+        setOnlineUsers((prev) => {
+          const updated = new Set(prev);
+          updated.delete(userId);
+          return updated;
+        });
+
+        // Update last seen time
+        if (lastActive) {
+          setLastSeen((prev) => ({
+            ...prev,
+            [userId]: new Date(lastActive),
+          }));
+        }
+      });
+
+      socket.on("messageRead", ({ conversationId, messageId }) => {
+        console.log("Message read notification:", {
+          conversationId,
+          messageId,
+        });
+
+        // Update the read status of messages
+        setActiveConversation((prev) => {
+          if (!prev || prev.id !== conversationId) return prev;
+
+          return {
+            ...prev,
+            messages: prev.messages.map((msg) =>
+              msg.id === messageId || (msg.senderId !== user?.id && !msg.read)
+                ? { ...msg, read: true }
+                : msg
+            ),
+          };
+        });
+
+        // Also update in the conversations list
+        setConversations((prev) =>
+          prev.map((conv) => {
+            if (conv.id !== conversationId) return conv;
+
+            return {
+              ...conv,
+              messages: conv.messages.map((msg) =>
+                msg.id === messageId || (msg.senderId !== user?.id && !msg.read)
+                  ? { ...msg, read: true }
+                  : msg
+              ),
+            };
+          })
+        );
+      });
+
       socketInitialized.current = true;
 
       // Clean up on unmount
@@ -245,23 +323,83 @@ export function Messages() {
     }
   }, [user]);
 
+  // Fetch user settings
+  useEffect(() => {
+    if (user) {
+      // In a real app, this would be an API call to get user settings
+      // For now, we'll simulate it
+      const fetchUserSettings = async () => {
+        try {
+          // This would be an API call in a real app
+          // const { data } = await axios.get("/api/users/settings")
+          // setUserSettings(data.settings)
+
+          // For now, we'll use default settings
+          setUserSettings({
+            showOnlineStatus: true,
+            showReadReceipts: true,
+          });
+        } catch (error) {
+          console.error("Error fetching user settings:", error);
+        }
+      };
+
+      fetchUserSettings();
+    }
+  }, [user]);
+
   // Mark messages as read when viewing a conversation
   useEffect(() => {
     if (activeConversation) {
-      // Mark all messages in this conversation as read
-      axios
-        .put(`/api/messages/${activeConversation.id}/read`)
-        .then(() => {
-          // Update the unread message count in the navbar (via socket)
-          if (socket) {
-            socket.emit("messagesRead");
-          }
-        })
-        .catch((error) => {
-          console.error("Error marking messages as read:", error);
-        });
+      // Check if there are any unread messages from the other user
+      const hasUnreadMessages = activeConversation.messages.some(
+        (msg) => !msg.read && msg.senderId !== user?.id
+      );
+
+      if (hasUnreadMessages) {
+        // Mark all messages in this conversation as read
+        axios
+          .put(`/api/messages/${activeConversation.id}/read`)
+          .then(() => {
+            // Update the unread message count in the navbar (via socket)
+            if (socket) {
+              socket.emit("messagesRead", {
+                conversationId: activeConversation.id,
+                userId: activeConversation.user.id,
+              });
+            }
+
+            // Update the read status locally
+            setActiveConversation((prev) => {
+              if (!prev) return null;
+              return {
+                ...prev,
+                messages: prev.messages.map((msg) =>
+                  msg.senderId !== user?.id ? { ...msg, read: true } : msg
+                ),
+              };
+            });
+
+            // Also update in the conversations list
+            setConversations((prev) =>
+              prev.map((conv) => {
+                if (conv.id !== activeConversation.id) return conv;
+
+                return {
+                  ...conv,
+                  messages: conv.messages.map((msg) =>
+                    msg.senderId !== user?.id ? { ...msg, read: true } : msg
+                  ),
+                };
+              })
+            );
+          })
+          .catch((error) => {
+            console.error("Error marking messages as read:", error);
+          });
+      }
     }
-  }, [activeConversation]);
+  }, [activeConversation, user?.id]);
 
   // Scroll to bottom when new messages are added
   useEffect(() => {
@@ -578,37 +716,41 @@ export function Messages() {
                 const hasUnreadMessages = conversation.messages.some(
                   (msg) => !msg.read && msg.senderId !== user?.id
                 );
+                const isActive = activeConversation?.id === conversation.id;
 
                 return (
                   <button
                     key={conversation.id}
                     className={`flex w-full items-center gap-3 p-4 text-left transition-all duration-300 hover:bg-gray-800 border-b border-gray-800 ${
-                      activeConversation?.id === conversation.id
-                        ? "bg-gray-800"
-                        : ""
+                      isActive ? "bg-gray-800" : ""
                     }`}
                     onClick={() => setActiveConversation(conversation)}
                   >
-                    <Avatar className="h-12 w-12">
-                      <AvatarImage
-                        src={conversation.user.profilePicture}
-                        alt={conversation.user.username}
-                      />
-                      <AvatarFallback>
-                        {conversation.user.username.charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
+                    <div className="relative">
+                      <Avatar className="h-12 w-12">
+                        <AvatarImage
+                          src={conversation.user.profilePicture}
+                          alt={conversation.user.username}
+                        />
+                        <AvatarFallback>
+                          {conversation.user.username.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      {onlineUsers.has(conversation.user.id.toString()) && (
+                        <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-gray-800"></span>
+                      )}
+                    </div>
                     <div className="flex-1 overflow-hidden">
                       <div
                         className={`font-medium text-lg ${
-                          hasUnreadMessages ? "font-bold" : ""
+                          hasUnreadMessages && !isActive ? "font-bold" : ""
                         }`}
                       >
                         {conversation.user.username}
                       </div>
                       <div
                         className={`truncate text-sm ${
-                          hasUnreadMessages
+                          hasUnreadMessages && !isActive
                             ? "font-semibold text-white"
                             : "text-gray-400"
                         }`}
@@ -628,21 +770,37 @@ export function Messages() {
       {activeConversation ? (
         <div className="flex flex-1 flex-col">
           <div className="flex items-center gap-3 border-b border-gray-800 p-4 bg-gray-900">
-            <Avatar className="h-10 w-10">
-              <AvatarImage
-                src={activeConversation.user.profilePicture}
-                alt={activeConversation.user.username}
-              />
-              <AvatarFallback>
-                {activeConversation.user.username.charAt(0).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <div className="font-medium text-lg">
-                {activeConversation.user.username}
+            <Link
+              href={`/profile/${activeConversation.user.username}`}
+              className="flex items-center gap-3 hover:opacity-90 transition-opacity"
+            >
+              <Avatar className="h-10 w-10">
+                <AvatarImage
+                  src={activeConversation.user.profilePicture}
+                  alt={activeConversation.user.username}
+                />
+                <AvatarFallback>
+                  {activeConversation.user.username.charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1">
+                <div className="font-medium text-lg">
+                  {activeConversation.user.username}
+                </div>
+                <div className="text-xs text-gray-400">
+                  {onlineUsers.has(activeConversation.user.id.toString())
+                    ? "Active now"
+                    : lastSeen[activeConversation.user.id.toString()]
+                    ? `Last seen ${formatDistanceToNow(
+                        new Date(
+                          lastSeen[activeConversation.user.id.toString()]
+                        ),
+                        { addSuffix: true }
+                      )}`
+                    : "Offline"}
+                </div>
               </div>
-              <div className="text-xs text-gray-400">Active now</div>
-            </div>
+            </Link>
           </div>
 
           <ScrollArea className="flex-1 p-4 bg-black">
@@ -701,6 +859,15 @@ export function Messages() {
                               addSuffix: true,
                             })}
                           </span>
+
+                          {/* Read receipt */}
+                          {isCurrentUser &&
+                            userSettings.showReadReceipts &&
+                            message.read && (
+                              <span className="text-blue-400 text-[10px]">
+                                Read
+                              </span>
+                            )}
 
                           {/* Actions that appear on hover */}
                           <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center">

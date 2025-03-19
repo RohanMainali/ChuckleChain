@@ -273,6 +273,8 @@ exports.sendMessage = async (req, res) => {
   }
 };
 
+// Update the markMessagesAsRead function to handle read receipts
+
 // @desc    Mark messages as read
 // @route   PUT /api/messages/:conversationId/read
 // @access  Private
@@ -297,6 +299,13 @@ exports.markMessagesAsRead = async (req, res) => {
       });
     }
 
+    // Find all unread messages sent by the other user
+    const unreadMessages = await Message.find({
+      conversationId,
+      senderId: { $ne: req.user.id },
+      read: false,
+    });
+
     // Mark all unread messages sent by the other user as read
     await Message.updateMany(
       {
@@ -307,11 +316,37 @@ exports.markMessagesAsRead = async (req, res) => {
       { read: true }
     );
 
+    // Get the other participant to notify them that their messages were read
+    const otherParticipantId = conversation.participants.find(
+      (participant) => participant.toString() !== req.user.id
+    );
+
+    // Emit socket event for each message that was marked as read
+    const io = req.app.get("io");
+    if (io && unreadMessages.length > 0) {
+      const { isUserOnline } = require("../socket");
+
+      // Only send read receipts if the other user is online
+      if (isUserOnline(otherParticipantId)) {
+        unreadMessages.forEach((message) => {
+          io.to(otherParticipantId.toString()).emit("messageRead", {
+            conversationId,
+            messageId: message._id,
+            readBy: req.user.id,
+            timestamp: new Date(),
+          });
+        });
+      }
+    }
+
     res.status(200).json({
       success: true,
-      data: {},
+      data: {
+        markedAsRead: unreadMessages.length,
+      },
     });
   } catch (error) {
+    console.error("Error marking messages as read:", error);
     res.status(500).json({
       success: false,
       message: error.message,

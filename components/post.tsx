@@ -343,20 +343,19 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
                 </Link>
                 <div className="mt-1 text-sm">{reply.text}</div>
 
-                {/* Comment actions - visible on hover */}
-                <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 rounded-full"
-                      >
-                        <MoreHorizontal className="h-3 w-3" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      {(reply.user === user?.username || isCurrentUserPost) && (
+                {reply.user === user?.username && (
+                  <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 rounded-full"
+                        >
+                          <MoreHorizontal className="h-3 w-3" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
                         <DropdownMenuItem
                           onClick={() => handleDeleteComment(reply.id)}
                           className="text-destructive"
@@ -364,10 +363,10 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
                           <Trash2 className="mr-2 h-4 w-4" />
                           Delete
                         </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                )}
               </div>
               <div className="flex gap-4 mt-1 ml-1">
                 <button
@@ -561,21 +560,19 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
                             </Link>
                             <div className="mt-1">{comment.text}</div>
 
-                            {/* Comment actions - visible on hover */}
-                            <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6 rounded-full"
-                                  >
-                                    <MoreHorizontal className="h-3 w-3" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  {(comment.user === user?.username ||
-                                    isCurrentUserPost) && (
+                            {comment.user === user?.username && (
+                              <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6 rounded-full"
+                                    >
+                                      <MoreHorizontal className="h-3 w-3" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
                                     <DropdownMenuItem
                                       onClick={() =>
                                         handleDeleteComment(comment.id)
@@ -585,10 +582,10 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
                                       <Trash2 className="mr-2 h-4 w-4" />
                                       Delete
                                     </DropdownMenuItem>
-                                  )}
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            )}
                           </div>
                           <div className="flex gap-4 mt-1.5 ml-1">
                             <button

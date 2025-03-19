@@ -61,7 +61,7 @@ export function Navbar() {
     }
 
     // Refresh count every minute
-    const interval = setInterval(fetchUnreadCount, 60000);
+    const interval = setInterval(fetchUnreadCount, 1000);
 
     return () => {
       clearInterval(interval);
@@ -108,7 +108,7 @@ export function Navbar() {
     }
 
     // Refresh count every minute
-    const interval = setInterval(fetchUnreadMessages, 60000);
+    const interval = setInterval(fetchUnreadMessages, 1000);
 
     return () => {
       clearInterval(interval);
@@ -118,6 +118,33 @@ export function Navbar() {
       }
     };
   }, [user]);
+
+  // Update the socket connection to track user online status
+
+  // Add this to the useEffect that handles socket connections:
+  // This would typically be in the AuthProvider component, but we'll add it here for demonstration
+  const socket = (window as any).socket;
+  useEffect(() => {
+    // Update user's online status when the app is focused/blurred
+    const handleVisibilityChange = () => {
+      if (socket) {
+        if (document.visibilityState === "visible") {
+          socket.emit("userActive");
+          console.log("User is active, emitting userActive event");
+        } else {
+          socket.emit("userInactive");
+          console.log("User is inactive, emitting userInactive event");
+        }
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    // Clean up
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [socket]);
 
   const handleSearchChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;

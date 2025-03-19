@@ -4,6 +4,8 @@ const User = require("./models/User");
 
 // Map to store active user connections
 const activeUsers = new Map();
+// Map to store last seen timestamps
+const lastSeenTimestamps = new Map();
 
 const initializeSocket = (server) => {
   const io = socketIo(server, {
@@ -47,27 +49,58 @@ const initializeSocket = (server) => {
   });
 
   io.on("connection", (socket) => {
-    console.log(
-      `User connected: ${socket.user.username} with ID: ${socket.id}`
-    );
+    const userId = socket.user._id.toString();
+    console.log(`User connected: ${socket.user.username} with ID: ${userId}`);
 
     // Add user to active users map
-    activeUsers.set(socket.user._id.toString(), socket.id);
+    activeUsers.set(userId, socket.id);
+
+    // Remove user from lastSeenTimestamps if they're now online
+    lastSeenTimestamps.delete(userId);
+
+    // Broadcast to all clients that this user is now online
+    socket.broadcast.emit("userConnected", userId);
+
+    // Handle request for online users
+    socket.on("getOnlineUsers", () => {
+      socket.emit("onlineUsers", Array.from(activeUsers.keys()));
+    });
 
     // Handle messagesRead event
-    socket.on("messagesRead", () => {
+    socket.on("messagesRead", ({ conversationId, userId }) => {
       // Emit an event to update the unread count in the navbar
       socket.emit("updateUnreadCount");
+
+      // Notify the sender that their messages were read
+      const recipientSocketId = activeUsers.get(userId);
+      if (recipientSocketId) {
+        io.to(recipientSocketId).emit("messageRead", {
+          conversationId,
+          readBy: socket.user._id,
+        });
+      }
     });
 
     // Handle disconnect
     socket.on("disconnect", () => {
       console.log(`User disconnected: ${socket.user.username}`);
-      activeUsers.delete(socket.user._id.toString());
+
+      // Store last seen timestamp
+      const now = new Date();
+      lastSeenTimestamps.set(userId, now);
+
+      // Remove from active users
+      activeUsers.delete(userId);
+
+      // Broadcast to all clients that this user is now offline
+      socket.broadcast.emit("userDisconnected", userId, now.toISOString());
     });
 
     // Send a welcome message to confirm connection
     socket.emit("welcome", { message: "Socket connection established" });
+
+    // Send the current list of online users
+    socket.emit("onlineUsers", Array.from(activeUsers.keys()));
   });
 
   return io;
@@ -119,8 +152,20 @@ const emitNewNotification = (io, userId, notification) => {
   }
 };
 
+// Function to get a user's last seen timestamp
+const getLastSeen = (userId) => {
+  return lastSeenTimestamps.get(userId.toString()) || null;
+};
+
+// Function to check if a user is online
+const isUserOnline = (userId) => {
+  return activeUsers.has(userId.toString());
+};
+
 module.exports = {
   initializeSocket,
   emitNewMessage,
   emitNewNotification,
+  getLastSeen,
+  isUserOnline,
 };
