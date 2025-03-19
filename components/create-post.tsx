@@ -1,24 +1,30 @@
-"use client"
+"use client";
 
-import React from "react"
+import React from "react";
 
-import { useState, useRef, type ChangeEvent } from "react"
-import { v4 as uuidv4 } from "uuid"
-import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
-import { Card, CardContent, CardFooter } from "@/components/ui/card"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { ImageIcon, X, AlertCircle } from "lucide-react"
-import { useAuth } from "@/components/auth-provider"
-import type { Post } from "@/lib/types"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Label } from "@/components/ui/label"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import axios from "axios"
+import { useState, useRef, type ChangeEvent } from "react";
+import { v4 as uuidv4 } from "uuid";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ImageIcon, X, AlertCircle } from "lucide-react";
+import { useAuth } from "@/components/auth-provider";
+import type { Post } from "@/lib/types";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import axios from "axios";
 
 interface CreatePostProps {
-  onPostCreated: (post: Post) => void
+  onPostCreated: (post: Post) => void;
 }
 
 // Categories for memes
@@ -31,74 +37,76 @@ const categories = [
   { name: "Music", value: "music" },
   { name: "TV Shows", value: "tv" },
   { name: "Other", value: "other" },
-]
+];
 
 export function CreatePost({ onPostCreated }: CreatePostProps) {
-  const { user } = useAuth()
-  const [caption, setCaption] = useState("")
-  const [image, setImage] = useState<string | null>(null)
-  const [isCreating, setIsCreating] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const [category, setCategory] = useState<string | null>(null)
-  const [textPosition, setTextPosition] = useState<"top" | "bottom">("top")
-  const [captionPlacement, setCaptionPlacement] = useState<"on-image" | "whitespace">("on-image")
+  const { user } = useAuth();
+  const [caption, setCaption] = useState("");
+  const [image, setImage] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [category, setCategory] = useState<string | null>(null);
+  const [textPosition, setTextPosition] = useState<"top" | "bottom">("top");
+  const [captionPlacement, setCaptionPlacement] = useState<
+    "on-image" | "whitespace"
+  >("on-image");
 
   const handleCaptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setCaption(e.target.value)
-    if (error) setError(null)
-  }
+    setCaption(e.target.value);
+    if (error) setError(null);
+  };
 
   const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
+    const file = e.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        setError("Image size should be less than 5MB")
-        return
+        setError("Image size should be less than 5MB");
+        return;
       }
 
-      const reader = new FileReader()
+      const reader = new FileReader();
       reader.onload = () => {
-        setImage(reader.result as string)
-        if (error) setError(null)
-      }
-      reader.readAsDataURL(file)
+        setImage(reader.result as string);
+        if (error) setError(null);
+      };
+      reader.readAsDataURL(file);
     }
-  }
+  };
 
   const handleRemoveImage = () => {
-    setImage(null)
+    setImage(null);
     if (fileInputRef.current) {
-      fileInputRef.current.value = ""
+      fileInputRef.current.value = "";
     }
-  }
+  };
 
   const handleCreatePost = async () => {
     if (!caption) {
-      setError("Please add a caption for your meme")
-      return
+      setError("Please add a caption for your meme");
+      return;
     }
 
     if (!image) {
-      setError("Please add an image for your meme")
-      return
+      setError("Please add an image for your meme");
+      return;
     }
 
-    setIsCreating(true)
-    setError(null)
+    setIsCreating(true);
+    setError(null);
 
     try {
       // First upload the image to Cloudinary
-      const uploadResponse = await axios.post("/api/upload", { image })
+      const uploadResponse = await axios.post("/api/upload", { image });
 
       if (!uploadResponse.data.success) {
-        throw new Error("Failed to upload image")
+        throw new Error("Failed to upload image");
       }
 
-      const imageUrl = uploadResponse.data.data.url
+      const imageUrl = uploadResponse.data.data.url;
 
       // Prepare meme text if needed
-      let memeText
+      let memeText;
       if (captionPlacement === "on-image") {
         memeText = {
           id: uuidv4(),
@@ -115,7 +123,7 @@ export function CreatePost({ onPostCreated }: CreatePostProps) {
           underline: false,
           uppercase: true,
           outline: true,
-        }
+        };
       }
 
       // Create the post with the Cloudinary image URL
@@ -125,26 +133,26 @@ export function CreatePost({ onPostCreated }: CreatePostProps) {
         category: category || undefined,
         memeTexts: captionPlacement === "on-image" ? [memeText] : undefined,
         captionPlacement: captionPlacement,
-      }
+      };
 
-      const { data } = await axios.post("/api/posts", postData)
+      const { data } = await axios.post("/api/posts", postData);
 
       if (data.success) {
-        onPostCreated(data.data)
-        setCaption("")
-        setImage(null)
-        setCategory(null)
+        onPostCreated(data.data);
+        setCaption("");
+        setImage(null);
+        setCategory(null);
         if (fileInputRef.current) {
-          fileInputRef.current.value = ""
+          fileInputRef.current.value = "";
         }
       }
     } catch (error) {
-      console.error("Error creating post:", error)
-      setError("Failed to create post. Please try again.")
+      console.error("Error creating post:", error);
+      setError("Failed to create post. Please try again.");
     } finally {
-      setIsCreating(false)
+      setIsCreating(false);
     }
-  }
+  };
 
   return (
     <Card>
@@ -152,7 +160,9 @@ export function CreatePost({ onPostCreated }: CreatePostProps) {
         <div className="flex gap-3">
           <Avatar>
             <AvatarImage src={user?.profilePicture} alt={user?.username} />
-            <AvatarFallback>{user?.username.charAt(0).toUpperCase()}</AvatarFallback>
+            <AvatarFallback>
+              {user?.username.charAt(0).toUpperCase()}
+            </AvatarFallback>
           </Avatar>
           <div className="flex-1">
             <Textarea
@@ -193,7 +203,9 @@ export function CreatePost({ onPostCreated }: CreatePostProps) {
                             </div>
                           </div>
                           <img
-                            src={image || "/placeholder.svg?height=400&width=600"}
+                            src={
+                              image || "/placeholder.svg?height=400&width=600"
+                            }
                             alt="Meme template"
                             className="w-full"
                           />
@@ -201,7 +213,9 @@ export function CreatePost({ onPostCreated }: CreatePostProps) {
                       ) : (
                         <>
                           <img
-                            src={image || "/placeholder.svg?height=400&width=600"}
+                            src={
+                              image || "/placeholder.svg?height=400&width=600"
+                            }
                             alt="Meme template"
                             className="w-full rounded-md"
                           />
@@ -214,7 +228,8 @@ export function CreatePost({ onPostCreated }: CreatePostProps) {
                               lineHeight: "1.2", // Added line height for better readability
                               color: "#FFFFFF",
                               textTransform: "uppercase",
-                              textShadow: "-2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000", // Stronger text shadow
+                              textShadow:
+                                "-2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000", // Stronger text shadow
                               width: "90%", // Wider text area
                               wordWrap: "break-word",
                               transform: "translate(-50%, -50%)",
@@ -225,12 +240,15 @@ export function CreatePost({ onPostCreated }: CreatePostProps) {
                               ? caption.split("\n").map((line, i) => (
                                   <React.Fragment key={i}>
                                     {i > 0 && <br />}
-                                    {line || (textPosition === "top" ? "TOP TEXT" : "BOTTOM TEXT")}
+                                    {line ||
+                                      (textPosition === "top"
+                                        ? "TOP TEXT"
+                                        : "BOTTOM TEXT")}
                                   </React.Fragment>
                                 ))
                               : textPosition === "top"
-                                ? "TOP TEXT"
-                                : "BOTTOM TEXT"}
+                              ? "TOP TEXT"
+                              : "BOTTOM TEXT"}
                           </div>
                         </>
                       )}
@@ -242,7 +260,9 @@ export function CreatePost({ onPostCreated }: CreatePostProps) {
                     <Label className="mb-2 block">Caption Style</Label>
                     <RadioGroup
                       value={captionPlacement}
-                      onValueChange={(value) => setCaptionPlacement(value as "on-image" | "whitespace")}
+                      onValueChange={(value) =>
+                        setCaptionPlacement(value as "on-image" | "whitespace")
+                      }
                       className="flex gap-4"
                     >
                       <div className="flex items-center space-x-2">
@@ -262,7 +282,9 @@ export function CreatePost({ onPostCreated }: CreatePostProps) {
                       <Label className="mb-2 block">Text Position</Label>
                       <RadioGroup
                         value={textPosition}
-                        onValueChange={(value) => setTextPosition(value as "top" | "bottom")}
+                        onValueChange={(value) =>
+                          setTextPosition(value as "top" | "bottom")
+                        }
                         className="flex gap-4"
                       >
                         <div className="flex items-center space-x-2">
@@ -308,8 +330,18 @@ export function CreatePost({ onPostCreated }: CreatePostProps) {
       </CardContent>
       <CardFooter className="flex justify-between border-t px-6 py-3">
         <div>
-          <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageChange} />
-          <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()}>
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            ref={fileInputRef}
+            onChange={handleImageChange}
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => fileInputRef.current?.click()}
+          >
             <ImageIcon className="mr-2 h-4 w-4" />
             Add Image
           </Button>
@@ -327,6 +359,5 @@ export function CreatePost({ onPostCreated }: CreatePostProps) {
         </Button>
       </CardFooter>
     </Card>
-  )
+  );
 }
-
