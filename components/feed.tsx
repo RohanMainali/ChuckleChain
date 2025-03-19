@@ -77,8 +77,13 @@ export function Feed() {
   ) => {
     // If this is just a refresh trigger, don't make an API call
     if (comment.isRefreshTrigger) {
-      // Just trigger a re-render by creating a new array
-      setPosts((prevPosts) => [...prevPosts]);
+      // Create a new posts array to force a re-render
+      setPosts((currentPosts) => {
+        // Find the post and create a new reference to trigger re-render
+        return currentPosts.map((post) =>
+          post.id === postId ? { ...post } : post
+        );
+      });
       return;
     }
 
