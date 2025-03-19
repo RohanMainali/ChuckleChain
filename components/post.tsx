@@ -231,8 +231,13 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
         >
           <div className="bg-white p-3 text-center border-b">
             <div
-              className="font-bold text-black uppercase tracking-wide"
-              style={{ fontFamily: "'Impact', sans-serif" }}
+              className="text-black uppercase tracking-wide"
+              style={{
+                fontFamily: "'Impact', sans-serif",
+                fontWeight: "600", // Less bold than before
+                fontSize: "18px", // Controlled font size
+                letterSpacing: "0.5px", // Better letter spacing
+              }}
             >
               {post.text}
             </div>
@@ -274,13 +279,13 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
         />
         {post.memeTexts.map((text) => (
           <div
-            key={text.id}
-            className="absolute select-none"
+            key={text.text}
+            className="absolute left-1/2 transform -translate-x-1/2 text-center select-none px-2 py-1"
             style={{
-              left: `${text.x}%`,
-              top: `${text.y}%`,
+              top: text.y + "%",
               fontFamily: text.fontFamily,
               fontSize: `${text.fontSize}px`,
+              lineHeight: "1.2", // Added line height for better readability
               color: text.color,
               backgroundColor:
                 text.backgroundColor !== "transparent"
@@ -292,10 +297,9 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
               textDecoration: text.underline ? "underline" : "none",
               textTransform: text.uppercase ? "uppercase" : "none",
               textShadow: text.outline
-                ? "-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000"
-                : "none",
-              padding: "0.25rem",
-              maxWidth: "80%",
+                ? "-2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000"
+                : "none", // Stronger shadow
+              width: "90%", // Wider text area
               wordWrap: "break-word",
               transform: "translate(-50%, -50%)",
             }}
