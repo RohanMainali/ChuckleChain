@@ -1,46 +1,46 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import type { Post as PostType } from "@/lib/types"
-import { Post } from "@/components/post"
-import axios from "axios"
+import { useState, useEffect } from "react";
+import type { Post as PostType } from "@/lib/types";
+import { Post } from "@/components/post";
+import axios from "axios";
 
 export function FreshMemes() {
-  const [posts, setPosts] = useState<PostType[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [posts, setPosts] = useState<PostType[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchFreshPosts = async () => {
       try {
-        setLoading(true)
-        const { data } = await axios.get("/api/posts/fresh")
+        setLoading(true);
+        const { data } = await axios.get("/api/posts/fresh");
         if (data.success) {
-          setPosts(data.data || [])
+          setPosts(data.data || []);
         }
       } catch (error) {
-        console.error("Error fetching fresh posts:", error)
-        setError("Failed to load fresh memes. Please try again later.")
+        console.error("Error fetching fresh posts:", error);
+        setError("Failed to load fresh memes. Please try again later.");
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
-    fetchFreshPosts()
-  }, [])
+    fetchFreshPosts();
+  }, []);
 
   const handleDeletePost = async (postId: string) => {
     try {
-      await axios.delete(`/api/posts/${postId}`)
-      setPosts(posts.filter((post) => post.id !== postId))
+      await axios.delete(`/api/posts/${postId}`);
+      setPosts(posts.filter((post) => post.id !== postId));
     } catch (error) {
-      console.error("Error deleting post:", error)
+      console.error("Error deleting post:", error);
     }
-  }
+  };
 
   const handleLikePost = async (postId: string) => {
     try {
-      const { data } = await axios.put(`/api/posts/${postId}/like`)
+      const { data } = await axios.put(`/api/posts/${postId}/like`);
 
       if (data.success) {
         setPosts(
@@ -50,20 +50,43 @@ export function FreshMemes() {
                 ...post,
                 isLiked: data.data.isLiked,
                 likes: data.data.isLiked ? post.likes + 1 : post.likes - 1,
-              }
+              };
             }
-            return post
-          }),
-        )
+            return post;
+          })
+        );
       }
     } catch (error) {
-      console.error("Error liking post:", error)
+      console.error("Error liking post:", error);
     }
-  }
+  };
 
-  const handleAddComment = async (postId: string, comment: { id: string; user: string; text: string }) => {
+  // Update the handleAddComment function to properly handle refresh triggers
+  const handleAddComment = async (
+    postId: string,
+    comment: {
+      id: string;
+      user: string;
+      text: string;
+      isRefreshTrigger?: boolean;
+    }
+  ) => {
+    // If this is just a refresh trigger, don't make an API call
+    if (comment.isRefreshTrigger) {
+      // Create a new posts array to force a re-render
+      setPosts((currentPosts) => {
+        // Find the post and create a new reference to trigger re-render
+        return currentPosts.map((post) =>
+          post.id === postId ? { ...post } : post
+        );
+      });
+      return;
+    }
+
     try {
-      const { data } = await axios.post(`/api/posts/${postId}/comments`, { text: comment.text })
+      const { data } = await axios.post(`/api/posts/${postId}/comments`, {
+        text: comment.text,
+      });
 
       if (data.success) {
         setPosts(
@@ -72,16 +95,16 @@ export function FreshMemes() {
               return {
                 ...post,
                 comments: [...post.comments, data.data],
-              }
+              };
             }
-            return post
-          }),
-        )
+            return post;
+          })
+        );
       }
     } catch (error) {
-      console.error("Error adding comment:", error)
+      console.error("Error adding comment:", error);
     }
-  }
+  };
 
   if (loading) {
     return (
@@ -90,7 +113,7 @@ export function FreshMemes() {
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
         </div>
       </div>
-    )
+    );
   }
 
   if (error) {
@@ -101,7 +124,7 @@ export function FreshMemes() {
           <p className="text-muted-foreground">{error}</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -111,7 +134,9 @@ export function FreshMemes() {
       {posts.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-12 text-center">
           <h3 className="text-lg font-medium">No fresh memes yet</h3>
-          <p className="text-muted-foreground">Be the first to post a fresh meme!</p>
+          <p className="text-muted-foreground">
+            Be the first to post a fresh meme!
+          </p>
         </div>
       ) : (
         <div className="space-y-6">
@@ -127,6 +152,5 @@ export function FreshMemes() {
         </div>
       )}
     </div>
-  )
+  );
 }
-
