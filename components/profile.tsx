@@ -190,8 +190,22 @@ export function Profile({ profile: initialProfile, username }: ProfileProps) {
 
   const handleAddComment = async (
     postId: string,
-    comment: { id: string; user: string; text: string }
+    comment: {
+      id: string;
+      user: string;
+      text: string;
+      isRefreshTrigger?: boolean;
+    }
   ) => {
+    // If this is just a refresh trigger, don't make an API call
+    if (comment.isRefreshTrigger) {
+      // Create a new posts array to force a re-render
+      setPosts((currentPosts) =>
+        currentPosts.map((post) => (post.id === postId ? { ...post } : post))
+      );
+      return;
+    }
+
     try {
       const { data } = await axios.post(`/api/posts/${postId}/comments`, {
         text: comment.text,
