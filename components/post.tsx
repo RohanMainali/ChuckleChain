@@ -1,101 +1,83 @@
-"use client";
+"use client"
 
-import type React from "react";
+import React from "react"
 
-import { useState, useRef } from "react";
-import { formatDistanceToNow } from "date-fns";
-import { v4 as uuidv4 } from "uuid";
-import {
-  Heart,
-  MessageCircle,
-  MoreHorizontal,
-  Share2,
-  Trash2,
-  Tag,
-  X,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardFooter, CardHeader } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Input } from "@/components/ui/input";
-import { useAuth } from "@/components/auth-provider";
-import type { Post as PostType } from "@/lib/types";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { ShareDialog } from "@/components/share-dialog";
-import axios from "axios";
-import { toast } from "@/hooks/use-toast";
+import { useState, useRef } from "react"
+import { formatDistanceToNow } from "date-fns"
+import { v4 as uuidv4 } from "uuid"
+import { Heart, MessageCircle, MoreHorizontal, Share2, Trash2, Tag, X } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Card, CardFooter, CardHeader } from "@/components/ui/card"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Input } from "@/components/ui/input"
+import { useAuth } from "@/components/auth-provider"
+import type { Post as PostType } from "@/lib/types"
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { ShareDialog } from "@/components/share-dialog"
+import axios from "axios"
+import { toast } from "@/hooks/use-toast"
 
 interface PostProps {
-  post: PostType;
-  onDelete: (postId: string) => void;
-  onLike: (postId: string) => void;
+  post: PostType
+  onDelete: (postId: string) => void
+  onLike: (postId: string) => void
   onComment: (
     postId: string,
     comment: {
-      id: string;
-      user: string;
-      profilePicture?: string;
-      text: string;
-      replyTo?: string;
-      isRefreshTrigger?: boolean;
-    }
-  ) => void;
+      id: string
+      user: string
+      profilePicture?: string
+      text: string
+      replyTo?: string
+      isRefreshTrigger?: boolean
+    },
+  ) => void
 }
 
 export function Post({ post, onDelete, onLike, onComment }: PostProps) {
-  const { user } = useAuth();
-  const [comment, setComment] = useState("");
-  const [showComments, setShowComments] = useState(false);
-  const [shareDialogOpen, setShareDialogOpen] = useState(false);
-  const commentInputRef = useRef<HTMLInputElement>(null);
-  const router = useRouter();
-  const [replyingTo, setReplyingTo] = useState<{
-    id: string;
-    username: string;
-  } | null>(null);
+  const { user } = useAuth()
+  const [comment, setComment] = useState("")
+  const [showComments, setShowComments] = useState(false)
+  const [shareDialogOpen, setShareDialogOpen] = useState(false)
+  const commentInputRef = useRef<HTMLInputElement>(null)
+  const router = useRouter()
+  const [replyingTo, setReplyingTo] = useState<{ id: string; username: string } | null>(null)
 
-  const isCurrentUserPost = post.user.id === user?.id;
+  const isCurrentUserPost = post.user.id === user?.id
 
   const handleLike = () => {
-    onLike(post.id);
-  };
+    onLike(post.id)
+  }
 
   const handleDelete = () => {
-    onDelete(post.id);
-  };
+    onDelete(post.id)
+  }
 
   const handleCommentClick = () => {
-    setShowComments(true);
+    setShowComments(true)
     setTimeout(() => {
-      commentInputRef.current?.focus();
-    }, 100);
-  };
+      commentInputRef.current?.focus()
+    }, 100)
+  }
 
   // Update the handleDeleteComment function to immediately update the UI
   const handleDeleteComment = async (commentId: string) => {
     try {
-      const { data } = await axios.delete(
-        `/api/posts/${post.id}/comments/${commentId}`
-      );
+      const { data } = await axios.delete(`/api/posts/${post.id}/comments/${commentId}`)
 
       if (data.success) {
         // Remove the comment and any replies to it from the UI
         const updatedComments = post.comments.filter(
-          (comment) => comment.id !== commentId && comment.replyTo !== commentId
-        );
+          (comment) => comment.id !== commentId && comment.replyTo !== commentId,
+        )
 
         // Update the post's comments array
-        post.comments = updatedComments;
+        post.comments = updatedComments
 
         // Force a re-render by creating a new array
         onComment(post.id, {
@@ -103,46 +85,43 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
           user: "",
           text: "",
           isRefreshTrigger: true,
-        });
+        })
 
         toast({
           title: "Success",
           description: "Comment deleted successfully",
-        });
+        })
       }
     } catch (error) {
-      console.error("Error deleting comment:", error);
+      console.error("Error deleting comment:", error)
       toast({
         title: "Error",
         description: "Failed to delete comment. Please try again.",
         variant: "destructive",
-      });
+      })
     }
-  };
+  }
 
   // Update the handleReplyToComment function to ensure it works correctly
   const handleReplyToComment = (commentId: string, username: string) => {
-    setReplyingTo({ id: commentId, username });
-    setShowComments(true);
+    setReplyingTo({ id: commentId, username })
+    setShowComments(true)
     setTimeout(() => {
-      commentInputRef.current?.focus();
-    }, 100);
-  };
+      commentInputRef.current?.focus()
+    }, 100)
+  }
 
   // Update the handleAddComment function to properly handle replies
   const handleAddComment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!comment.trim()) return;
+    e.preventDefault()
+    if (!comment.trim()) return
 
     try {
       if (replyingTo) {
         // If replying to a comment, use the reply API endpoint
-        const { data } = await axios.post(
-          `/api/posts/${post.id}/comments/${replyingTo.id}/reply`,
-          {
-            text: comment,
-          }
-        );
+        const { data } = await axios.post(`/api/posts/${post.id}/comments/${replyingTo.id}/reply`, {
+          text: comment,
+        })
 
         if (data.success) {
           // Add the reply to the post's comments
@@ -155,15 +134,15 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
             timestamp: data.data.createdAt,
             likeCount: 0,
             isLiked: false,
-          };
+          }
 
-          post.comments.push(newReply);
+          post.comments.push(newReply)
 
           // Force a re-render
           onComment(post.id, {
             ...newReply,
             isRefreshTrigger: true,
-          });
+          })
         }
       } else {
         // Regular comment
@@ -172,31 +151,29 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
           user: user?.username || "",
           profilePicture: user?.profilePicture,
           text: comment,
-        });
+        })
       }
 
       // Reset form
-      setComment("");
-      setReplyingTo(null);
+      setComment("")
+      setReplyingTo(null)
     } catch (error) {
-      console.error("Error adding comment:", error);
+      console.error("Error adding comment:", error)
       toast({
         title: "Error",
         description: "Failed to add comment. Please try again.",
         variant: "destructive",
-      });
+      })
     }
-  };
+  }
 
   const handleShare = () => {
-    setShareDialogOpen(true);
-  };
+    setShareDialogOpen(true)
+  }
 
   const handleLikeComment = async (commentId: string) => {
     try {
-      const { data } = await axios.put(
-        `/api/posts/${post.id}/comments/${commentId}/like`
-      );
+      const { data } = await axios.put(`/api/posts/${post.id}/comments/${commentId}/like`)
 
       if (data.success) {
         // Update the post comments with the updated like status
@@ -205,30 +182,25 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
             return {
               ...comment,
               isLiked: data.data.isLiked,
-              likeCount: data.data.isLiked
-                ? (comment.likeCount || 0) + 1
-                : (comment.likeCount || 1) - 1,
-            };
+              likeCount: data.data.isLiked ? (comment.likeCount || 0) + 1 : (comment.likeCount || 1) - 1,
+            }
           }
-          return comment;
-        });
+          return comment
+        })
 
         // Update the post with the new comments
-        post.comments = updatedComments;
+        post.comments = updatedComments
       }
     } catch (error) {
-      console.error("Error liking comment:", error);
+      console.error("Error liking comment:", error)
     }
-  };
+  }
 
   // Render meme with custom text if available
   const renderMemeContent = () => {
     if (post.captionPlacement === "whitespace") {
       return (
-        <div
-          className="relative cursor-pointer overflow-hidden rounded-md"
-          key={`post-${post.id}-whitespace`}
-        >
+        <div className="relative cursor-pointer overflow-hidden rounded-md" key={`post-${post.id}-whitespace`}>
           <div className="bg-white p-3 text-center border-b">
             <div
               className="text-black uppercase tracking-wide"
@@ -242,41 +214,21 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
               {post.text}
             </div>
           </div>
-          <img
-            src={post.image || "/placeholder.svg?height=400&width=600"}
-            alt={post.text}
-            className="w-full"
-          />
+          <img src={post.image || "/placeholder.svg?height=400&width=600"} alt={post.text} className="w-full" />
         </div>
-      );
+      )
     } else if (!post.memeTexts || post.memeTexts.length === 0) {
       return (
-        <div
-          className="relative cursor-pointer"
-          key={`post-${post.id}-default-content`}
-        >
-          <div className="absolute inset-x-0 top-0 bg-background/90 p-3 text-center font-medium">
-            {post.text}
-          </div>
-          <img
-            src={post.image || "/placeholder.svg?height=400&width=600"}
-            alt={post.text}
-            className="w-full pt-12"
-          />
+        <div className="relative cursor-pointer" key={`post-${post.id}-default-content`}>
+          <div className="absolute inset-x-0 top-0 bg-background/90 p-3 text-center font-medium">{post.text}</div>
+          <img src={post.image || "/placeholder.svg?height=400&width=600"} alt={post.text} className="w-full pt-12" />
         </div>
-      );
+      )
     }
 
     return (
-      <div
-        className="relative cursor-pointer"
-        key={`post-${post.id}-meme-content`}
-      >
-        <img
-          src={post.image || "/placeholder.svg?height=400&width=600"}
-          alt={post.text}
-          className="w-full"
-        />
+      <div className="relative cursor-pointer" key={`post-${post.id}-meme-content`}>
+        <img src={post.image || "/placeholder.svg?height=400&width=600"} alt={post.text} className="w-full" />
         {post.memeTexts.map((text) => (
           <div
             key={text.text}
@@ -287,37 +239,36 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
               fontSize: `${text.fontSize}px`,
               lineHeight: "1.2", // Added line height for better readability
               color: text.color,
-              backgroundColor:
-                text.backgroundColor !== "transparent"
-                  ? text.backgroundColor
-                  : "transparent",
+              backgroundColor: text.backgroundColor !== "transparent" ? text.backgroundColor : "transparent",
               textAlign: text.textAlign,
               fontWeight: text.bold ? "bold" : "normal",
               fontStyle: text.italic ? "italic" : "normal",
               textDecoration: text.underline ? "underline" : "none",
               textTransform: text.uppercase ? "uppercase" : "none",
-              textShadow: text.outline
-                ? "-2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000"
-                : "none", // Stronger shadow
+              textShadow: text.outline ? "-2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000" : "none", // Stronger shadow
               width: "90%", // Wider text area
               wordWrap: "break-word",
               transform: "translate(-50%, -50%)",
+              whiteSpace: "pre-line", // This preserves line breaks
             }}
           >
-            {text.text}
+            {text.text.split("\n").map((line, i) => (
+              <React.Fragment key={i}>
+                {i > 0 && <br />}
+                {line}
+              </React.Fragment>
+            ))}
           </div>
         ))}
       </div>
-    );
-  };
+    )
+  }
 
   // Function to render comment replies
   const renderCommentReplies = (commentId: string) => {
-    const replies = post.comments.filter(
-      (comment) => comment.replyTo === commentId
-    );
+    const replies = post.comments.filter((comment) => comment.replyTo === commentId)
 
-    if (replies.length === 0) return null;
+    if (replies.length === 0) return null
 
     return (
       <div className="ml-8 mt-2 space-y-3">
@@ -325,24 +276,13 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
           <div key={reply.id} className="flex gap-3">
             <Link href={`/profile/${reply.user}`} className="flex-shrink-0">
               <Avatar className="h-6 w-6">
-                <AvatarImage
-                  src={
-                    reply.profilePicture ||
-                    "/placeholder.svg?height=32&width=32"
-                  }
-                  alt={reply.user}
-                />
-                <AvatarFallback>
-                  {reply.user.charAt(0).toUpperCase()}
-                </AvatarFallback>
+                <AvatarImage src={reply.profilePicture || "/placeholder.svg?height=32&width=32"} alt={reply.user} />
+                <AvatarFallback>{reply.user.charAt(0).toUpperCase()}</AvatarFallback>
               </Avatar>
             </Link>
             <div className="flex-1">
               <div className="bg-muted/50 rounded-xl px-3 py-2 group relative">
-                <Link
-                  href={`/profile/${reply.user}`}
-                  className="font-medium text-xs hover:underline"
-                >
+                <Link href={`/profile/${reply.user}`} className="font-medium text-xs hover:underline">
                   {reply.user}
                 </Link>
                 <div className="mt-1 text-sm">{reply.text}</div>
@@ -351,19 +291,12 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
                   <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 rounded-full"
-                        >
+                        <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full">
                           <MoreHorizontal className="h-3 w-3" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() => handleDeleteComment(reply.id)}
-                          className="text-destructive"
-                        >
+                        <DropdownMenuItem onClick={() => handleDeleteComment(reply.id)} className="text-destructive">
                           <Trash2 className="mr-2 h-4 w-4" />
                           Delete
                         </DropdownMenuItem>
@@ -374,15 +307,10 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
               </div>
               <div className="flex gap-4 mt-1 ml-1">
                 <button
-                  className={`text-xs ${
-                    reply.isLiked
-                      ? "text-primary font-medium"
-                      : "text-muted-foreground"
-                  } hover:text-foreground`}
+                  className={`text-xs ${reply.isLiked ? "text-primary font-medium" : "text-muted-foreground"} hover:text-foreground`}
                   onClick={() => handleLikeComment(reply.id)}
                 >
-                  {reply.isLiked ? "Liked" : "Like"}{" "}
-                  {reply.likeCount ? `(${reply.likeCount})` : ""}
+                  {reply.isLiked ? "Liked" : "Like"} {reply.likeCount ? `(${reply.likeCount})` : ""}
                 </button>
                 <button
                   className="text-xs text-muted-foreground hover:text-foreground"
@@ -391,38 +319,27 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
                   Reply
                 </button>
                 <span className="text-xs text-muted-foreground">
-                  {formatDistanceToNow(
-                    new Date(reply.timestamp || Date.now()),
-                    { addSuffix: true }
-                  )}
+                  {formatDistanceToNow(new Date(reply.timestamp || Date.now()), { addSuffix: true })}
                 </span>
               </div>
             </div>
           </div>
         ))}
       </div>
-    );
-  };
+    )
+  }
 
   return (
     <Card className="overflow-hidden animate-fade-in hover:shadow-md transition-shadow duration-300">
       <CardHeader className="flex flex-row items-center gap-3 space-y-0 p-4">
         <Link href={`/profile/${post.user.username}`}>
           <Avatar>
-            <AvatarImage
-              src={post.user.profilePicture}
-              alt={post.user.username}
-            />
-            <AvatarFallback>
-              {post.user.username.charAt(0).toUpperCase()}
-            </AvatarFallback>
+            <AvatarImage src={post.user.profilePicture} alt={post.user.username} />
+            <AvatarFallback>{post.user.username.charAt(0).toUpperCase()}</AvatarFallback>
           </Avatar>
         </Link>
         <div className="flex-1">
-          <Link
-            href={`/profile/${post.user.username}`}
-            className="hover:underline"
-          >
+          <Link href={`/profile/${post.user.username}`} className="hover:underline">
             <div className="font-semibold">{post.user.username}</div>
           </Link>
           <div className="text-xs text-muted-foreground">
@@ -446,10 +363,7 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onClick={handleDelete}
-                className="text-destructive"
-              >
+              <DropdownMenuItem onClick={handleDelete} className="text-destructive">
                 <Trash2 className="mr-2 h-4 w-4" />
                 Delete
               </DropdownMenuItem>
@@ -460,9 +374,7 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
 
       <Dialog>
         <DialogTrigger asChild>{renderMemeContent()}</DialogTrigger>
-        <DialogContent className="max-w-3xl p-0">
-          {renderMemeContent()}
-        </DialogContent>
+        <DialogContent className="max-w-3xl p-0">{renderMemeContent()}</DialogContent>
       </Dialog>
 
       <CardFooter className="flex flex-col p-0">
@@ -480,8 +392,7 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
                   className="text-sm text-muted-foreground hover:text-foreground"
                   onClick={() => setShowComments(!showComments)}
                 >
-                  {post.comments.length}{" "}
-                  {post.comments.length === 1 ? "comment" : "comments"}
+                  {post.comments.length} {post.comments.length === 1 ? "comment" : "comments"}
                 </button>
               )}
             </div>
@@ -494,14 +405,14 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
             variant="ghost"
             className={cn(
               "flex items-center justify-center gap-2 rounded-none py-3 h-auto",
-              post.isLiked ? "text-primary" : ""
+              post.isLiked ? "text-primary" : "",
             )}
             onClick={handleLike}
           >
             <Heart
               className={cn(
                 "h-5 w-5 transition-transform duration-300 hover:scale-110",
-                post.isLiked && "fill-current animate-pulse-once"
+                post.isLiked && "fill-current animate-pulse-once",
               )}
             />
             <span className="font-normal">Like</span>
@@ -537,29 +448,18 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
                   .map((comment) => (
                     <div key={comment.id} className="space-y-2">
                       <div className="flex gap-3">
-                        <Link
-                          href={`/profile/${comment.user}`}
-                          className="flex-shrink-0"
-                        >
+                        <Link href={`/profile/${comment.user}`} className="flex-shrink-0">
                           <Avatar className="h-8 w-8">
                             <AvatarImage
-                              src={
-                                comment.profilePicture ||
-                                "/placeholder.svg?height=32&width=32"
-                              }
+                              src={comment.profilePicture || "/placeholder.svg?height=32&width=32"}
                               alt={comment.user}
                             />
-                            <AvatarFallback>
-                              {comment.user.charAt(0).toUpperCase()}
-                            </AvatarFallback>
+                            <AvatarFallback>{comment.user.charAt(0).toUpperCase()}</AvatarFallback>
                           </Avatar>
                         </Link>
                         <div className="flex-1">
                           <div className="bg-muted rounded-xl px-4 py-2.5 group relative">
-                            <Link
-                              href={`/profile/${comment.user}`}
-                              className="font-medium text-sm hover:underline"
-                            >
+                            <Link href={`/profile/${comment.user}`} className="font-medium text-sm hover:underline">
                               {comment.user}
                             </Link>
                             <div className="mt-1">{comment.text}</div>
@@ -568,19 +468,13 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
                               <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-6 w-6 rounded-full"
-                                    >
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full">
                                       <MoreHorizontal className="h-3 w-3" />
                                     </Button>
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
                                     <DropdownMenuItem
-                                      onClick={() =>
-                                        handleDeleteComment(comment.id)
-                                      }
+                                      onClick={() => handleDeleteComment(comment.id)}
                                       className="text-destructive"
                                     >
                                       <Trash2 className="mr-2 h-4 w-4" />
@@ -593,31 +487,19 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
                           </div>
                           <div className="flex gap-4 mt-1.5 ml-1">
                             <button
-                              className={`text-xs ${
-                                comment.isLiked
-                                  ? "text-primary font-medium"
-                                  : "text-muted-foreground"
-                              } hover:text-foreground`}
+                              className={`text-xs ${comment.isLiked ? "text-primary font-medium" : "text-muted-foreground"} hover:text-foreground`}
                               onClick={() => handleLikeComment(comment.id)}
                             >
-                              {comment.isLiked ? "Liked" : "Like"}{" "}
-                              {comment.likeCount
-                                ? `(${comment.likeCount})`
-                                : ""}
+                              {comment.isLiked ? "Liked" : "Like"} {comment.likeCount ? `(${comment.likeCount})` : ""}
                             </button>
                             <button
                               className="text-xs text-muted-foreground hover:text-foreground"
-                              onClick={() =>
-                                handleReplyToComment(comment.id, comment.user)
-                              }
+                              onClick={() => handleReplyToComment(comment.id, comment.user)}
                             >
                               Reply
                             </button>
                             <span className="text-xs text-muted-foreground">
-                              {formatDistanceToNow(
-                                new Date(comment.timestamp || Date.now()),
-                                { addSuffix: true }
-                              )}
+                              {formatDistanceToNow(new Date(comment.timestamp || Date.now()), { addSuffix: true })}
                             </span>
                           </div>
                         </div>
@@ -634,15 +516,9 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
               {replyingTo && (
                 <div className="flex items-center gap-2 text-sm bg-muted/50 p-2 rounded-md">
                   <span>
-                    Replying to{" "}
-                    <span className="font-medium">@{replyingTo.username}</span>
+                    Replying to <span className="font-medium">@{replyingTo.username}</span>
                   </span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-5 w-5 ml-auto"
-                    onClick={() => setReplyingTo(null)}
-                  >
+                  <Button variant="ghost" size="icon" className="h-5 w-5 ml-auto" onClick={() => setReplyingTo(null)}>
                     <X className="h-3 w-3" />
                   </Button>
                 </div>
@@ -650,13 +526,8 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
 
               <div className="flex gap-3">
                 <Avatar className="h-8 w-8 flex-shrink-0">
-                  <AvatarImage
-                    src={user?.profilePicture}
-                    alt={user?.username}
-                  />
-                  <AvatarFallback>
-                    {user?.username.charAt(0).toUpperCase()}
-                  </AvatarFallback>
+                  <AvatarImage src={user?.profilePicture} alt={user?.username} />
+                  <AvatarFallback>{user?.username.charAt(0).toUpperCase()}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1">
                   <div className="relative">
@@ -669,13 +540,7 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
                     />
                   </div>
 
-                  <Button
-                    type="submit"
-                    variant="ghost"
-                    size="sm"
-                    className="mt-2"
-                    disabled={!comment.trim()}
-                  >
+                  <Button type="submit" variant="ghost" size="sm" className="mt-2" disabled={!comment.trim()}>
                     Post
                   </Button>
                 </div>
@@ -685,13 +550,9 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
         )}
 
         {/* Share Dialog */}
-        <ShareDialog
-          open={shareDialogOpen}
-          onOpenChange={setShareDialogOpen}
-          post={post}
-          className="animate-fade-in"
-        />
+        <ShareDialog open={shareDialogOpen} onOpenChange={setShareDialogOpen} post={post} className="animate-fade-in" />
       </CardFooter>
     </Card>
-  );
+  )
 }
+
