@@ -50,6 +50,7 @@ import {
 import axios from "axios";
 import { toast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
+import { useMobile } from "@/hooks/use-mobile";
 
 // Add this at the beginning of the file, after the imports
 // Declare the global window type to include our comment ID mapping
@@ -94,6 +95,7 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
     id: string;
     username: string;
   } | null>(null);
+  const { isMobile } = useMobile();
 
   const [isEditing, setIsEditing] = useState(false);
   const [editedText, setEditedText] = useState(post.text);
@@ -719,6 +721,18 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
     }
   };
 
+  // Calculate font size based on screen size for meme text
+  const getMemeTextFontSize = () => {
+    if (isMobile) {
+      return post.memeTexts && post.memeTexts[0]?.fontSize
+        ? Math.max(16, Math.floor(post.memeTexts[0].fontSize * 0.6))
+        : 24;
+    }
+    return post.memeTexts && post.memeTexts[0]?.fontSize
+      ? post.memeTexts[0].fontSize
+      : 36;
+  };
+
   // Render meme with custom text if available
   const renderMemeContent = () => {
     // If in editing mode, show the edit form instead
@@ -746,7 +760,7 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
                       style={{
                         fontFamily: "'Impact', sans-serif",
                         fontWeight: "600",
-                        fontSize: "18px",
+                        fontSize: isMobile ? "14px" : "18px",
                         letterSpacing: "0.5px",
                       }}
                     >
@@ -757,6 +771,7 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
                     src={post.image || "/placeholder.svg?height=400&width=600"}
                     alt={editedText}
                     className="w-full"
+                    loading="lazy"
                   />
                 </div>
               ) : !post.memeTexts || post.memeTexts.length === 0 ? (
@@ -768,6 +783,7 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
                     src={post.image || "/placeholder.svg?height=400&width=600"}
                     alt={editedText}
                     className="w-full pt-12"
+                    loading="lazy"
                   />
                 </div>
               ) : (
@@ -776,6 +792,7 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
                     src={post.image || "/placeholder.svg?height=400&width=600"}
                     alt={editedText}
                     className="w-full"
+                    loading="lazy"
                   />
                   {post.memeTexts.map((text, index) => (
                     <div
@@ -784,7 +801,9 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
                       style={{
                         top: text.y + "%",
                         fontFamily: text.fontFamily,
-                        fontSize: `${text.fontSize}px`,
+                        fontSize: isMobile
+                          ? `${Math.max(16, Math.floor(text.fontSize * 0.6))}px`
+                          : `${text.fontSize}px`,
                         lineHeight: "1.2",
                         color: text.color,
                         backgroundColor:
@@ -864,7 +883,7 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
               style={{
                 fontFamily: "'Impact', sans-serif",
                 fontWeight: "600", // Less bold than before
-                fontSize: "18px", // Controlled font size
+                fontSize: isMobile ? "14px" : "18px", // Smaller on mobile
                 letterSpacing: "0.5px", // Better letter spacing
               }}
             >
@@ -875,6 +894,7 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
             src={post.image || "/placeholder.svg?height=400&width=600"}
             alt={post.text}
             className="w-full"
+            loading="lazy"
           />
         </div>
       );
@@ -891,6 +911,7 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
             src={post.image || "/placeholder.svg?height=400&width=600"}
             alt={post.text}
             className="w-full pt-12"
+            loading="lazy"
           />
         </div>
       );
@@ -905,6 +926,7 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
           src={post.image || "/placeholder.svg?height=400&width=600"}
           alt={post.text}
           className="w-full"
+          loading="lazy"
         />
         {post.memeTexts.map((text, index) => (
           <div
@@ -913,7 +935,7 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
             style={{
               top: text.y + "%",
               fontFamily: text.fontFamily,
-              fontSize: `${text.fontSize}px`,
+              fontSize: `${getMemeTextFontSize()}px`,
               lineHeight: "1.2", // Added line height for better readability
               color: text.color,
               backgroundColor:
