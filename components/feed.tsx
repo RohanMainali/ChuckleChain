@@ -73,11 +73,22 @@ export function Feed() {
       user: string;
       text: string;
       isRefreshTrigger?: boolean;
+      updatedPost?: PostType; // Add this property
     }
   ) => {
     // If this is just a refresh trigger, don't make an API call
     if (comment.isRefreshTrigger) {
-      // Create a new posts array to force a re-render
+      // If an updated post was provided, use it directly
+      if (comment.updatedPost) {
+        setPosts((currentPosts) => {
+          return currentPosts.map((post) =>
+            post.id === postId ? comment.updatedPost! : post
+          );
+        });
+        return;
+      }
+
+      // Otherwise, create a new posts array to force a re-render
       setPosts((currentPosts) => {
         // Find the post and create a new reference to trigger re-render
         return currentPosts.map((post) =>
