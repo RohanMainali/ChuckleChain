@@ -40,6 +40,7 @@ export function Messages() {
   const [unreadConversations, setUnreadConversations] = useState<Set<string>>(new Set())
   const [newMessageAnimation, setNewMessageAnimation] = useState(false)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
+  const messagesContentRef = useRef<HTMLDivElement>(null)
 
   // Add these state variables after the existing ones:
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set())
@@ -725,7 +726,7 @@ export function Messages() {
           <h2 className="text-xl font-bold">Messages</h2>
         </div>
 
-        <div className="overflow-y-auto flex-grow">
+        <div className="messages-list">
           <div className="space-y-0">
             {conversations.length === 0 ? (
               <div className="flex flex-col items-center justify-center p-6 text-center">
@@ -811,8 +812,8 @@ export function Messages() {
             </Link>
           </div>
 
-          <div className="messages-content flex-1 overflow-y-auto p-4 bg-transparent" ref={messagesContainerRef}>
-            <div className="space-y-3 pb-2">
+          <div className="messages-content" ref={messagesContentRef}>
+            <div className="space-y-3 p-4">
               {activeConversation.messages.map((message, index) => {
                 // Message rendering logic remains the same
                 // No changes needed here, just reinstating the existing code:
@@ -961,93 +962,94 @@ export function Messages() {
             </div>
           </div>
 
-          {/* Reply indicator */}
-          {replyingTo && (
-            <div className="messages-input flex-shrink-0 px-4 py-2 border-t border-gray-800/50 flex items-center gap-2 bg-black/20">
-              <div className="flex-1 border-l-2 border-indigo-600 pl-2 py-1">
-                <div className="flex items-center gap-1">
-                  <Reply className="h-4 w-4 text-gray-400" />
-                  <div className="text-xs text-gray-400">
-                    Replying to {replyingTo.senderId === user?.id ? "yourself" : activeConversation.user.username}
+          {/* Message input wrapper - fixed at the bottom */}
+          <div className="messages-input-wrapper">
+            {/* Reply indicator */}
+            {replyingTo && (
+              <div className="px-4 py-2 flex items-center gap-2 bg-black/20 border-t border-gray-800/50">
+                <div className="flex-1 border-l-2 border-indigo-600 pl-2 py-1">
+                  <div className="flex items-center gap-1">
+                    <Reply className="h-4 w-4 text-gray-400" />
+                    <div className="text-xs text-gray-400">
+                      Replying to {replyingTo.senderId === user?.id ? "yourself" : activeConversation.user.username}
+                    </div>
                   </div>
+                  <div className="text-sm truncate">{replyingTo.text || (replyingTo.image ? "Image" : "Message")}</div>
                 </div>
-                <div className="text-sm truncate">{replyingTo.text || (replyingTo.image ? "Image" : "Message")}</div>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 rounded-full hover:bg-gray-800"
-                onClick={() => setReplyingTo(null)}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
-
-          {/* Message input with image preview */}
-          {messageImage && (
-            <div className="messages-input flex-shrink-0 px-4 py-2 border-t border-gray-800/50 bg-black/20">
-              <div className="relative inline-block">
-                <img
-                  src={messageImage || "/placeholder.svg"}
-                  alt="Message attachment preview"
-                  className="rounded-md h-20 object-cover"
-                />
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="absolute right-1 top-1 h-6 w-6 rounded-full bg-black/80 hover:bg-black"
-                  onClick={handleRemoveMessageImage}
+                  className="h-6 w-6 rounded-full hover:bg-gray-800"
+                  onClick={() => setReplyingTo(null)}
                 >
-                  <X className="h-3 w-3" />
+                  <X className="h-4 w-4" />
                 </Button>
               </div>
-            </div>
-          )}
+            )}
 
-          <form
-            onSubmit={handleSendMessage}
-            className="messages-input flex-shrink-0 flex gap-2 border-t border-gray-800/50 p-4 bg-black/20"
-          >
-            <div className="relative flex-1">
-              <Input
-                placeholder="Type a message..."
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                className="pr-10 bg-gray-800/50 border-gray-700/50 text-white placeholder:text-gray-400 focus-visible:ring-indigo-600 rounded-full"
-                disabled={isUploading}
-              />
-              <input
-                type="file"
-                accept="image/*"
-                ref={fileInputRef}
-                onChange={handleMessageImageChange}
-                className="hidden"
-              />
+            {/* Message image preview */}
+            {messageImage && (
+              <div className="px-4 py-2 bg-black/20 border-t border-gray-800/50">
+                <div className="relative inline-block">
+                  <img
+                    src={messageImage || "/placeholder.svg"}
+                    alt="Message attachment preview"
+                    className="rounded-md h-20 object-cover"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 top-1 h-6 w-6 rounded-full bg-black/80 hover:bg-black"
+                    onClick={handleRemoveMessageImage}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Message input form */}
+            <form onSubmit={handleSendMessage} className="messages-input flex gap-2 bg-black/20">
+              <div className="relative flex-1">
+                <Input
+                  placeholder="Type a message..."
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  className="pr-10 bg-gray-800/50 border-gray-700/50 text-white placeholder:text-gray-400 focus-visible:ring-indigo-600 rounded-full"
+                  disabled={isUploading}
+                />
+                <input
+                  type="file"
+                  accept="image/*"
+                  ref={fileInputRef}
+                  onChange={handleMessageImageChange}
+                  className="hidden"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full hover:bg-gray-700"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                >
+                  <Image className="h-4 w-4" />
+                </Button>
+              </div>
               <Button
-                type="button"
-                variant="ghost"
+                type="submit"
                 size="icon"
-                className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full hover:bg-gray-700"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
+                disabled={(!newMessage.trim() && !messageImage) || isUploading}
+                className="bg-indigo-600 hover:bg-indigo-700 transition-all duration-300 hover:scale-110 rounded-full mobile-touch-target"
               >
-                <Image className="h-4 w-4" />
+                {isUploading ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
               </Button>
-            </div>
-            <Button
-              type="submit"
-              size="icon"
-              disabled={(!newMessage.trim() && !messageImage) || isUploading}
-              className="bg-indigo-600 hover:bg-indigo-700 transition-all duration-300 hover:scale-110 rounded-full mobile-touch-target"
-            >
-              {isUploading ? (
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-            </Button>
-          </form>
+            </form>
+          </div>
         </div>
       ) : (
         <div className="flex flex-1 items-center justify-center h-full bg-transparent md:flex hidden">
@@ -1060,7 +1062,7 @@ export function Messages() {
 
       {/* Image preview dialog */}
       <Dialog open={imagePreviewOpen} onOpenChange={setImagePreviewOpen}>
-        <DialogContent className="max-w-3xl p-4 bg-gray-900 border-gray-800">
+        <DialogContent className="max-w-3xl p-4 bg-black border-gray-800">
           <DialogHeader>
             <DialogTitle className="text-white">Image</DialogTitle>
           </DialogHeader>
