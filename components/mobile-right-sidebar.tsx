@@ -127,7 +127,7 @@ export function MobileRightSidebar({ open, onOpenChange }: MobileRightSidebarPro
           {activeTab === "profile" ? (
             <div className="space-y-4">
               <div className="bg-muted/30 p-4 rounded-lg">
-                <h4 className="font-medium mb-2">2-day streak!</h4>
+                <h4 className="font-medium mb-2">{userStats.streak}-day streak!</h4>
                 <p className="text-sm">Post today to keep your streak going!</p>
               </div>
 
