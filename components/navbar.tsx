@@ -214,8 +214,8 @@ export function Navbar({ onMenuToggle, sidebarOpen, onRightSidebarToggle, rightS
 
         {/* Center section with search */}
         {!isMobile && (
-          <div className="flex-1 max-w-md mx-4">
-            <div className="relative">
+          <div className="flex-1 flex justify-center mx-4">
+            <div className="relative w-full max-w-md">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 type="search"
