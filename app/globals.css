@@ -80,31 +80,77 @@
   }
   body {
     @apply bg-background text-foreground;
+    overflow: hidden; /* Prevent body scrolling */
+    height: 100vh;
+    width: 100vw;
+    position: fixed;
   }
 }
 
-/* Fix for message container to prevent scrolling issues */
+/* Improved message container to prevent scrolling issues */
 .messages-container {
   display: flex;
   flex-direction: column;
   height: calc(100vh - 4rem); /* Adjust based on navbar height */
   max-height: calc(100vh - 4rem);
   overflow: hidden;
+  position: relative;
+}
+
+.messages-list {
+  height: 100%;
+  overflow-y: auto;
 }
 
 .messages-content {
   flex: 1;
   overflow-y: auto;
-  display: flex;
-  flex-direction: column;
+  padding-bottom: 1rem;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding-bottom: 4.5rem; /* Make room for the input area */
+}
+
+.messages-input-wrapper {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: hsl(var(--background));
+  z-index: 10;
+  border-top: 1px solid hsl(var(--border));
 }
 
 .messages-input {
-  flex-shrink: 0;
-  position: sticky;
-  bottom: 0;
-  background-color: var(--background);
-  z-index: 10;
+  padding: 1rem;
+}
+
+/* Improved text overlay for mobile */
+.meme-text {
+  font-family: "Impact", "Arial Black", sans-serif;
+  text-shadow: -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000;
+  letter-spacing: 0.5px;
+  word-break: break-word;
+  white-space: pre-line;
+  text-align: center;
+  width: 90%;
+  max-width: 100%;
+  transform: translate(-50%, -50%);
+  position: absolute;
+  left: 50%;
+  padding: 0.25rem;
+}
+
+.meme-text-top {
+  top: 15%;
+}
+
+.meme-text-bottom {
+  bottom: 15%;
+  top: auto;
 }
 
 /* Mobile optimizations */
@@ -113,5 +159,182 @@
     height: calc(100vh - 4rem);
     max-height: calc(100vh - 4rem);
   }
+
+  .meme-text {
+    font-size: clamp(16px, 5vw, 24px) !important;
+    line-height: 1.2;
+    padding: 0.5rem;
+  }
+
+  /* Improved mobile text overlay */
+  .mobile-meme-text {
+    font-weight: 700 !important;
+    letter-spacing: 0.05em;
+    text-shadow: -1.5px -1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px 1.5px 0 #000, 1.5px 1.5px 0 #000 !important;
+  }
+}
+
+/* Respect user's reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-slide-up,
+  .animate-slide-right,
+  .animate-slide-left,
+  .animate-pulse-once,
+  .animate-bounce-subtle,
+  .animate-spin-slow,
+  .animate-shimmer {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Animation utility classes */
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.animate-slide-up {
+  animation: slideInUp 0.4s ease-out;
+}
+
+.animate-slide-right {
+  animation: slideInRight 0.4s ease-out;
+}
+
+.animate-slide-left {
+  animation: slideInLeft 0.4s ease-out;
+}
+
+.animate-pulse-once {
+  animation: pulse 0.5s ease-in-out;
+}
+
+.animate-bounce-subtle {
+  animation: bounce 1s ease-in-out infinite;
+}
+
+.animate-spin-slow {
+  animation: spin 2s linear infinite;
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.2) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Add these keyframe animations at the end of the file */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Custom scrollbar styles */
+.scrollbar-thin {
+  scrollbar-width: thin;
+}
+
+.scrollbar-thumb-muted-foreground\/20::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--muted-foreground) / 0.2);
+  border-radius: 9999px;
+}
+
+.scrollbar-track-transparent::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--muted-foreground) / 0.2);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-track {
+  background-color: transparent;
 }
 
