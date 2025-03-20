@@ -135,7 +135,7 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
 
   // Search for users to tag
   const searchForUsers = async (query: string) => {
-    if (query.length < 2) return;
+    if (query.length < 1) return; // Reduced minimum length to 1 character
 
     try {
       const { data } = await axios.get(
@@ -143,29 +143,17 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
       );
       if (data.success) {
         setSearchUsers(data.data);
+        // Force the mention popover to stay open if we have results
+        if (data.data.length > 0) {
+          setShowMentionPopover(true);
+        }
       }
     } catch (error) {
       console.error("Error searching for users:", error);
     }
   };
 
-  // Handle tagging a user
-  const handleTagUser = (selectedUser: { id: string; username: string }) => {
-    // For comments, we'll insert the @username into the comment text
-    const newComment = comment + `@${selectedUser.username} `;
-    setComment(newComment);
-    setShowTagPopover(false);
-    setShowMentionPopover(false);
-
-    // Focus back on the input
-    setTimeout(() => {
-      if (commentInputRef.current) {
-        commentInputRef.current.focus();
-      }
-    }, 100);
-  };
-
-  // Handle comment input changes and detect @ mentions
+  // Update the handleCommentChange function to better track the @ position
   const handleCommentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setComment(e.target.value);
 
@@ -187,6 +175,35 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
     } else {
       setShowMentionPopover(false);
     }
+  };
+
+  // Update the handleTagUser function to properly replace the partial username
+  const handleTagUser = (selectedUser: { id: string; username: string }) => {
+    // Find the last @ symbol position
+    const lastAtSymbol = comment.lastIndexOf("@");
+
+    if (lastAtSymbol !== -1) {
+      // Get the text before the @ symbol
+      const beforeAt = comment.substring(0, lastAtSymbol);
+
+      // Create the new comment text by replacing the partial username
+      const newComment = beforeAt + `@${selectedUser.username} `;
+      setComment(newComment);
+    } else {
+      // If no @ symbol found (unlikely), just append the username
+      const newComment = comment + `@${selectedUser.username} `;
+      setComment(newComment);
+    }
+
+    setShowTagPopover(false);
+    setShowMentionPopover(false);
+
+    // Focus back on the input
+    setTimeout(() => {
+      if (commentInputRef.current) {
+        commentInputRef.current.focus();
+      }
+    }, 100);
   };
 
   // Update the handleSaveEdit function to properly update memeTexts if needed
@@ -279,7 +296,17 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
     setEditedText(post.text);
   };
 
-  // Update the handleAddComment function to better track real IDs
+  // Update the extractMentions function to better handle mentions
+  const extractMentions = (text: string): string[] => {
+    const mentionRegex = /@(\w+)/g;
+    const matches = text.match(mentionRegex);
+    if (!matches) return [];
+
+    // Remove the @ symbol and extract just the usernames
+    return matches.map((match) => match.substring(1));
+  };
+
+  // Update the handleAddComment function to properly handle mentions
   const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!comment.trim()) return;
@@ -287,6 +314,7 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
     try {
       // Extract mentions from the comment
       const mentions = extractMentions(comment);
+      console.log("Extracted mentions:", mentions);
 
       if (replyingTo) {
         // Create an optimistic reply to update the UI immediately
@@ -319,7 +347,9 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
             "Sending reply to endpoint:",
             endpoint,
             "with text:",
-            comment
+            comment,
+            "and mentions:",
+            mentions
           );
 
           const { data } = await axios.post(endpoint, {
@@ -439,53 +469,42 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
     }
   };
 
-  // Extract @mentions from text
-  const extractMentions = (text: string): string[] => {
-    const mentionRegex = /@(\w+)/g;
-    const matches = text.match(mentionRegex);
-    if (!matches) return [];
-
-    return matches.map((match) => match.substring(1)); // Remove the @ symbol
-  };
-
   // Update the handleDeleteComment function to handle immediate deletions better
   const handleDeleteComment = async (commentId: string) => {
     try {
+      // Optimistically update UI first - remove the comment and its replies
+      const updatedComments = post.comments.filter(
+        (comment) => comment.id !== commentId && comment.replyTo !== commentId
+      );
+
+      // Create a new post object with the updated comments
+      const updatedPost = {
+        ...post,
+        comments: updatedComments,
+      };
+
+      // Force an immediate re-render by passing the updated post to the callback
+      onComment(post.id, {
+        id: "refresh-trigger",
+        user: "",
+        text: "",
+        isRefreshTrigger: true,
+        updatedPost: updatedPost,
+      });
+
       // Check if this is a temporary ID (from optimistic updates)
       if (commentId.startsWith("temp-")) {
         // Check if we have a mapping to a real ID
         const realId = window._commentIdMap?.[commentId];
 
         if (realId) {
-          // Use the real ID instead
+          // Use the real ID for the API call
           commentId = realId;
           console.log(
             `Using mapped real ID ${realId} for temp ID ${commentId}`
           );
         } else {
-          // If we can't find a real ID yet, just remove it from the UI
-          // and mark it for deletion when it becomes available
-          // IMPORTANT: Create a completely new array to ensure React detects the change
-          const updatedComments = post.comments.filter(
-            (comment) => comment.id !== commentId
-          );
-
-          // Create a new post object with the updated comments
-          const updatedPost = {
-            ...post,
-            comments: updatedComments,
-          };
-
-          // Force an immediate re-render by passing the updated post to the callback
-          onComment(post.id, {
-            id: "refresh-trigger",
-            user: "",
-            text: "",
-            isRefreshTrigger: true,
-            updatedPost: updatedPost, // Pass the updated post object
-          });
-
-          // Store this temp ID to be deleted when it gets a real ID
+          // If we can't find a real ID yet, just store this temp ID to be deleted when it gets a real ID
           window._pendingDeletions = window._pendingDeletions || [];
           window._pendingDeletions.push({
             postId: post.id,
@@ -503,30 +522,8 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
         }
       }
 
-      // IMPORTANT: Create a completely new array to ensure React detects the change
-      // Filter out the comment and any replies to it
-      const updatedComments = post.comments.filter(
-        (comment) => comment.id !== commentId && comment.replyTo !== commentId
-      );
-
-      // Create a new post object with the updated comments
-      const updatedPost = {
-        ...post,
-        comments: updatedComments,
-      };
-
-      // Force an immediate re-render by passing the updated post to the callback
-      onComment(post.id, {
-        id: "refresh-trigger",
-        user: "",
-        text: "",
-        isRefreshTrigger: true,
-        updatedPost: updatedPost, // Pass the updated post object
-      });
-
-      console.log(`Deleting comment with ID: ${commentId}`);
-
       // Make the API call after updating the UI
+      console.log(`Deleting comment with ID: ${commentId}`);
       const { data } = await axios.delete(
         `/api/posts/${post.id}/comments/${commentId}`
       );
@@ -1392,19 +1389,12 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
                         }
                       }}
                     />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 rounded-full"
-                      onClick={() => setShowTagPopover(true)}
-                    >
-                      <AtSign className="h-4 w-4" />
-                    </Button>
-
-                    {/* Mention popover */}
+                    {/* Mention popover - improved to ensure it stays visible */}
                     {showMentionPopover && searchUsers.length > 0 && (
                       <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg z-50 max-h-[200px] overflow-y-auto">
+                        <div className="p-2 text-xs text-muted-foreground border-b sticky top-0 bg-background">
+                          Select a user to mention
+                        </div>
                         {searchUsers.map((user) => (
                           <div
                             key={user.id}
@@ -1425,13 +1415,26 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
                                 {user.username.charAt(0).toUpperCase()}
                               </AvatarFallback>
                             </Avatar>
-                            <span>@{user.username}</span>
+                            <span className="font-medium">
+                              @{user.username}
+                            </span>
                           </div>
                         ))}
                       </div>
                     )}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 rounded-full"
+                      onClick={() => {
+                        setShowTagPopover(true);
+                        setShowMentionPopover(false);
+                      }}
+                    >
+                      <AtSign className="h-4 w-4" />
+                    </Button>
                   </div>
-
                   <div className="flex gap-2 mt-2">
                     <Button
                       type="submit"
