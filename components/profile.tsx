@@ -22,6 +22,10 @@ import {
   Heart,
   MessageCircle,
   Bug,
+  List,
+  Calendar,
+  MapPin,
+  LinkIcon,
 } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { Post } from "@/components/post";
@@ -30,6 +34,7 @@ import { SettingsDialog } from "@/components/settings-dialog";
 import type { UserProfile, Post as PostType } from "@/lib/types";
 import axios from "axios";
 import { toast } from "@/hooks/use-toast";
+import { useMobile } from "@/hooks/use-mobile";
 
 interface ProfileProps {
   profile: UserProfile;
@@ -46,6 +51,7 @@ interface FollowUser {
 export function Profile({ profile: initialProfile, username }: ProfileProps) {
   const { user, updateUser } = useAuth();
   const router = useRouter();
+  const { isMobile } = useMobile();
   const [isFollowing, setIsFollowing] = useState(
     initialProfile?.isFollowing || false
   );
@@ -372,109 +378,273 @@ export function Profile({ profile: initialProfile, username }: ProfileProps) {
     );
   }
 
-  return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      <Card className="animate-fade-in">
-        <CardContent className="p-6">
-          <div className="flex flex-col items-center gap-6 md:flex-row md:items-start">
-            <Avatar className="h-24 w-24 md:h-32 md:w-32">
-              <AvatarImage
-                src={currentProfile.profilePicture}
-                alt={currentProfile.username}
-              />
-              <AvatarFallback className="text-2xl">
-                {currentProfile.username.charAt(0).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
+  // Render different profile card layouts for mobile and desktop
+  const renderProfileCard = () => {
+    if (isMobile) {
+      // Enhanced mobile profile view
+      return (
+        <Card className="animate-fade-in overflow-hidden bg-gradient-to-b from-black/40 to-black/10 backdrop-blur-sm">
+          <CardContent className="p-0">
+            {/* Cover image background */}
+            <div className="h-24 w-full bg-gradient-to-r from-indigo-600/30 to-purple-600/30"></div>
 
-            <div className="flex flex-1 flex-col items-center text-center md:items-start md:text-left">
-              <div className="flex flex-wrap items-center gap-4">
-                <h1 className="text-2xl font-bold">
+            {/* Profile content */}
+            <div className="px-4 pb-6 -mt-12">
+              {/* Avatar with border */}
+              <div className="flex justify-center">
+                <Avatar className="h-24 w-24 border-4 border-background shadow-lg">
+                  <AvatarImage
+                    src={currentProfile.profilePicture}
+                    alt={currentProfile.username}
+                  />
+                  <AvatarFallback className="text-2xl">
+                    {currentProfile.username.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              </div>
+
+              {/* Username and buttons */}
+              <div className="mt-4 text-center">
+                <h1 className="text-2xl font-bold mb-1">
                   {currentProfile.username}
                 </h1>
+                <h2 className="text-lg text-muted-foreground mb-3">
+                  {currentProfile.fullName}
+                </h2>
 
-                {isCurrentUser ? (
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setIsEditProfileOpen(true)}
-                    >
-                      <Edit className="mr-2 h-4 w-4" />
-                      Edit Profile
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => setIsSettingsOpen(true)}
-                    >
-                      <Settings className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={handleDebugRelationships}
-                      title="Debug Relationships"
-                    >
-                      <Bug className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="flex gap-2">
-                    <Button
-                      variant={isFollowing ? "outline" : "default"}
-                      onClick={handleFollow}
-                      className="transition-all duration-300 hover:scale-105"
-                    >
-                      {isFollowing ? "Following" : "Follow"}
-                    </Button>
-                    <Button variant="outline" onClick={handleMessageUser}>
-                      <MessageSquare className="mr-2 h-4 w-4" />
-                      Message
-                    </Button>
+                {/* Bio with styled container */}
+                {currentProfile.bio && (
+                  <div className="mb-4 px-4 py-2 bg-black/20 rounded-lg text-sm">
+                    <p>{currentProfile.bio}</p>
                   </div>
                 )}
-              </div>
 
-              <div className="mt-4 flex gap-6">
-                <button
-                  className="text-center hover:opacity-80"
-                  onClick={() => openFollowDialog("followers")}
-                >
-                  <div className="font-bold">{followerCount}</div>
-                  <div className="text-sm text-muted-foreground">Followers</div>
-                </button>
-                <button
-                  className="text-center hover:opacity-80"
-                  onClick={() => openFollowDialog("following")}
-                >
-                  <div className="font-bold">{followingCount}</div>
-                  <div className="text-sm text-muted-foreground">Following</div>
-                </button>
-                <div className="text-center">
-                  <div className="font-bold">{posts.length}</div>
-                  <div className="text-sm text-muted-foreground">Posts</div>
+                {/* Action buttons */}
+                <div className="flex justify-center gap-2 mt-3">
+                  {isCurrentUser ? (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsEditProfileOpen(true)}
+                        className="rounded-full"
+                      >
+                        <Edit className="mr-2 h-4 w-4" />
+                        Edit Profile
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setIsSettingsOpen(true)}
+                        className="rounded-full"
+                      >
+                        <Settings className="h-4 w-4" />
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        variant={isFollowing ? "outline" : "default"}
+                        onClick={handleFollow}
+                        className="rounded-full transition-all duration-300 hover:scale-105"
+                      >
+                        {isFollowing ? "Following" : "Follow"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={handleMessageUser}
+                        className="rounded-full"
+                      >
+                        <MessageSquare className="mr-2 h-4 w-4" />
+                        Message
+                      </Button>
+                    </>
+                  )}
                 </div>
-              </div>
 
-              <div className="mt-4">
-                <div className="font-bold">{currentProfile.fullName}</div>
-                <p className="mt-1 max-w-md">{currentProfile.bio}</p>
-                {currentProfile.website && (
-                  <a
-                    href={currentProfile.website}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-1 block text-primary hover:underline"
+                {/* Stats with styled container */}
+                <div className="flex justify-center gap-8 mt-4 py-3 px-2 bg-black/10 rounded-lg">
+                  <button
+                    className="text-center hover:opacity-80"
+                    onClick={() => openFollowDialog("followers")}
                   >
-                    {currentProfile.website.replace(/^https?:\/\//, "")}
-                  </a>
+                    <div className="font-bold text-lg">{followerCount}</div>
+                    <div className="text-xs text-muted-foreground">
+                      Followers
+                    </div>
+                  </button>
+                  <button
+                    className="text-center hover:opacity-80"
+                    onClick={() => openFollowDialog("following")}
+                  >
+                    <div className="font-bold text-lg">{followingCount}</div>
+                    <div className="text-xs text-muted-foreground">
+                      Following
+                    </div>
+                  </button>
+                  <div className="text-center">
+                    <div className="font-bold text-lg">{posts.length}</div>
+                    <div className="text-xs text-muted-foreground">Posts</div>
+                  </div>
+                </div>
+
+                {/* Additional profile info */}
+                {(currentProfile.location ||
+                  currentProfile.website ||
+                  currentProfile.joinDate) && (
+                  <div className="mt-4 flex flex-col gap-2 text-sm">
+                    {currentProfile.location && (
+                      <div className="flex items-center justify-center gap-1 text-muted-foreground">
+                        <MapPin className="h-3 w-3" />
+                        <span>{currentProfile.location}</span>
+                      </div>
+                    )}
+                    {currentProfile.website && (
+                      <div className="flex items-center justify-center gap-1">
+                        <LinkIcon className="h-3 w-3 text-muted-foreground" />
+                        <a
+                          href={currentProfile.website}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline"
+                        >
+                          {currentProfile.website.replace(/^https?:\/\//, "")}
+                        </a>
+                      </div>
+                    )}
+                    {currentProfile.joinDate && (
+                      <div className="flex items-center justify-center gap-1 text-muted-foreground">
+                        <Calendar className="h-3 w-3" />
+                        <span>
+                          Joined{" "}
+                          {new Date(
+                            currentProfile.joinDate
+                          ).toLocaleDateString()}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      );
+    } else {
+      // Original desktop layout
+      return (
+        <Card className="animate-fade-in">
+          <CardContent className="p-6">
+            <div className="flex flex-col items-center gap-6 md:flex-row md:items-start">
+              <Avatar className="h-24 w-24 md:h-32 md:w-32">
+                <AvatarImage
+                  src={currentProfile.profilePicture}
+                  alt={currentProfile.username}
+                />
+                <AvatarFallback className="text-2xl">
+                  {currentProfile.username.charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+
+              <div className="flex flex-1 flex-col items-center text-center md:items-start md:text-left">
+                <div className="flex flex-wrap items-center gap-4">
+                  <h1 className="text-2xl font-bold">
+                    {currentProfile.username}
+                  </h1>
+
+                  {isCurrentUser ? (
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsEditProfileOpen(true)}
+                      >
+                        <Edit className="mr-2 h-4 w-4" />
+                        Edit Profile
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setIsSettingsOpen(true)}
+                      >
+                        <Settings className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={handleDebugRelationships}
+                        title="Debug Relationships"
+                      >
+                        <Bug className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Button
+                        variant={isFollowing ? "outline" : "default"}
+                        onClick={handleFollow}
+                        className="transition-all duration-300 hover:scale-105"
+                      >
+                        {isFollowing ? "Following" : "Follow"}
+                      </Button>
+                      <Button variant="outline" onClick={handleMessageUser}>
+                        <MessageSquare className="mr-2 h-4 w-4" />
+                        Message
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-4 flex gap-6">
+                  <button
+                    className="text-center hover:opacity-80"
+                    onClick={() => openFollowDialog("followers")}
+                  >
+                    <div className="font-bold">{followerCount}</div>
+                    <div className="text-sm text-muted-foreground">
+                      Followers
+                    </div>
+                  </button>
+                  <button
+                    className="text-center hover:opacity-80"
+                    onClick={() => openFollowDialog("following")}
+                  >
+                    <div className="font-bold">{followingCount}</div>
+                    <div className="text-sm text-muted-foreground">
+                      Following
+                    </div>
+                  </button>
+                  <div className="text-center">
+                    <div className="font-bold">{posts.length}</div>
+                    <div className="text-sm text-muted-foreground">Posts</div>
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <div className="font-bold">{currentProfile.fullName}</div>
+                  <p className="mt-1 max-w-md">{currentProfile.bio}</p>
+                  {currentProfile.website && (
+                    <a
+                      href={currentProfile.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-1 block text-primary hover:underline"
+                    >
+                      {currentProfile.website.replace(/^https?:\/\//, "")}
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      );
+    }
+  };
+
+  return (
+    <div className="mx-auto max-w-4xl space-y-6">
+      {renderProfileCard()}
 
       <Tabs defaultValue="posts">
         <div className="flex justify-between items-center">
@@ -490,6 +660,7 @@ export function Profile({ profile: initialProfile, username }: ProfileProps) {
               variant={viewMode === "grid" ? "default" : "outline"}
               size="sm"
               onClick={() => setViewMode("grid")}
+              className="rounded-md"
             >
               <Grid3X3 className="h-4 w-4" />
             </Button>
@@ -497,26 +668,9 @@ export function Profile({ profile: initialProfile, username }: ProfileProps) {
               variant={viewMode === "list" ? "default" : "outline"}
               size="sm"
               onClick={() => setViewMode("list")}
+              className="rounded-md"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="lucide lucide-list"
-              >
-                <line x1="8" x2="21" y1="6" y2="6" />
-                <line x1="8" x2="21" y1="12" y2="12" />
-                <line x1="8" x2="21" y1="18" y2="18" />
-                <line x1="3" x2="3.01" y1="6" y2="6" />
-                <line x1="3" x2="3.01" y1="12" y2="12" />
-                <line x1="3" x2="3.01" y1="18" y2="18" />
-              </svg>
+              <List className="h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -532,22 +686,22 @@ export function Profile({ profile: initialProfile, username }: ProfileProps) {
               </p>
             </div>
           ) : viewMode === "grid" ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-fade-in">
+            <div className="grid grid-cols-3 gap-2 p-1 animate-fade-in">
               {posts.map((post, index) => (
                 <div
                   key={post.id}
-                  className="relative group overflow-hidden rounded-md border animate-fade-in"
+                  className="relative group aspect-square overflow-hidden rounded-xl shadow-sm"
                   style={{ animationDelay: `${index * 0.05}s` }}
                 >
                   <Link href={`/post/${post.id}`}>
-                    <div className="aspect-square overflow-hidden">
+                    <div className="h-full w-full overflow-hidden">
                       <img
                         src={post.image || "/placeholder.svg"}
                         alt={post.text}
-                        className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
                       />
                     </div>
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl">
                       <div className="text-white flex gap-4">
                         <div className="flex items-center gap-1">
                           <Heart className="h-5 w-5 fill-white" />
