@@ -47,6 +47,7 @@ export default function PostPage({ params }: { params: { id: string } }) {
     }
   };
 
+  // Update the handleLikePost function to handle post updates
   const handleLikePost = async (postId: string) => {
     try {
       const { data } = await axios.put(`/api/posts/${postId}/like`);
@@ -66,7 +67,7 @@ export default function PostPage({ params }: { params: { id: string } }) {
     }
   };
 
-  // Update the handleAddComment function to properly handle refresh triggers
+  // Update the handleAddComment function to handle the updatedPost property
   const handleAddComment = async (
     postId: string,
     comment: {
@@ -74,11 +75,18 @@ export default function PostPage({ params }: { params: { id: string } }) {
       user: string;
       text: string;
       isRefreshTrigger?: boolean;
+      updatedPost?: PostType; // Add this property
     }
   ) => {
     // If this is just a refresh trigger, don't make an API call
     if (comment.isRefreshTrigger) {
-      // Create a new post object to force a re-render
+      // If an updated post was provided, use it directly
+      if (comment.updatedPost) {
+        setPost(comment.updatedPost);
+        return;
+      }
+
+      // Otherwise, create a new post object to force a re-render
       setPost((currentPost) => (currentPost ? { ...currentPost } : null));
       return;
     }
