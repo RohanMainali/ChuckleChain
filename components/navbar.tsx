@@ -9,30 +9,65 @@ import {
   Bell,
   Home,
   LaughIcon,
-  LogOut,
   MessageSquare,
+  Menu,
   Search,
+  X,
+  User,
+  LogOut,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/components/auth-provider";
 import { ModeToggle } from "@/components/mode-toggle";
+import { useMobile } from "@/hooks/use-mobile";
 import axios from "axios";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-export function Navbar() {
+interface NavbarProps {
+  onMenuToggle: (open: boolean) => void;
+  sidebarOpen: boolean;
+  onRightSidebarToggle: (open: boolean) => void;
+  rightSidebarOpen: boolean;
+}
+
+export function Navbar({
+  onMenuToggle,
+  sidebarOpen,
+  onRightSidebarToggle,
+  rightSidebarOpen,
+}: NavbarProps) {
   const { user, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const { isMobile } = useMobile();
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
+  const [showMobileSearch, setShowMobileSearch] = useState(false);
+  const [previousPath, setPreviousPath] = useState<string>("/feed");
 
   const handleLogout = () => {
     logout();
     router.push("/");
+  };
+
+  const toggleSidebar = () => {
+    if (onMenuToggle) {
+      // Store current path before opening sidebar
+      if (!sidebarOpen) {
+        setPreviousPath(pathname || "/feed");
+      }
+      onMenuToggle(!sidebarOpen);
+    }
+  };
+
+  const toggleRightSidebar = () => {
+    if (onRightSidebarToggle) {
+      onRightSidebarToggle(!rightSidebarOpen);
+    }
   };
 
   // Fetch unread notification count
@@ -61,7 +96,7 @@ export function Navbar() {
     }
 
     // Refresh count every minute
-    const interval = setInterval(fetchUnreadCount, 1000);
+    const interval = setInterval(fetchUnreadCount, 60000);
 
     return () => {
       clearInterval(interval);
@@ -108,7 +143,7 @@ export function Navbar() {
     }
 
     // Refresh count every minute
-    const interval = setInterval(fetchUnreadMessages, 1000);
+    const interval = setInterval(fetchUnreadMessages, 60000);
 
     return () => {
       clearInterval(interval);
@@ -120,9 +155,6 @@ export function Navbar() {
   }, [user]);
 
   // Update the socket connection to track user online status
-
-  // Add this to the useEffect that handles socket connections:
-  // This would typically be in the AuthProvider component, but we'll add it here for demonstration
   const socket = (window as any).socket;
   useEffect(() => {
     // Update user's online status when the app is focused/blurred
@@ -171,80 +203,170 @@ export function Navbar() {
     setSearchResults([]);
     setSearchQuery("");
     setShowSearchResults(false);
+    setShowMobileSearch(false);
   }, [pathname]);
+
+  // Handle swipe for mobile
+  useEffect(() => {
+    if (!isMobile) return;
+
+    let touchStartX = 0;
+    let touchEndX = 0;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      touchStartX = e.touches[0].clientX;
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      touchEndX = e.changedTouches[0].clientX;
+      handleSwipe();
+    };
+
+    const handleSwipe = () => {
+      const currentPath = pathname || "";
+
+      // Right to left swipe (open messages from any page except messages)
+      if (
+        touchStartX - touchEndX > 100 &&
+        !currentPath.includes("/messages") &&
+        !sidebarOpen
+      ) {
+        router.push("/messages");
+      }
+
+      // Left to right swipe (open sidebar from any page)
+      if (touchEndX - touchStartX > 100 && !sidebarOpen) {
+        setPreviousPath(currentPath);
+        onMenuToggle(true);
+      }
+
+      // When sidebar is open: left swipe closes it and returns to previous page
+      if (sidebarOpen && touchStartX - touchEndX > 100) {
+        onMenuToggle(false);
+        // Go back to the page we were on before opening the sidebar
+        router.push(previousPath);
+      }
+    };
+
+    document.addEventListener("touchstart", handleTouchStart, false);
+    document.addEventListener("touchend", handleTouchEnd, false);
+
+    return () => {
+      document.removeEventListener("touchstart", handleTouchStart);
+      document.removeEventListener("touchend", handleTouchEnd);
+    };
+  }, [isMobile, router, onMenuToggle, pathname, sidebarOpen, previousPath]);
 
   return (
     <header className="sticky top-0 z-50 border-b bg-background">
-      <div className="flex h-16 items-center justify-between w-full px-6">
-        <div className="flex items-center gap-2 md:gap-4">
-          <Link
-            href="/feed"
-            className="flex items-center gap-2 text-xl font-bold"
-          >
-            <LaughIcon className="h-8 w-8 text-primary" />
-            <span className="hidden md:inline">ChuckleChain</span>
-          </Link>
+      <div className="flex h-16 items-center justify-between w-full px-4 md:px-6">
+        {/* Left section with menu button and logo */}
+        <div className="flex items-center">
+          {/* Menu button for mobile */}
+          {isMobile && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="mr-2 md:hidden"
+              onClick={toggleSidebar}
+            >
+              {sidebarOpen ? (
+                <X className="h-5 w-5" />
+              ) : (
+                <Menu className="h-5 w-5" />
+              )}
+            </Button>
+          )}
 
-          <div className="relative ml-2 hidden md:block">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Search for users..."
-              className="w-[200px] pl-8 md:w-[300px]"
-              value={searchQuery}
-              onChange={handleSearchChange}
-              onFocus={() => setShowSearchResults(true)}
-              onBlur={() => setTimeout(() => setShowSearchResults(false), 200)}
-            />
-            {showSearchResults && searchResults.length > 0 && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg z-50 max-h-[300px] overflow-y-auto">
-                {searchResults.map((user) => (
-                  <Link
-                    key={user.id}
-                    href={`/profile/${user.username}`}
-                    className="flex items-center gap-3 p-3 hover:bg-muted transition-colors"
-                  >
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage
-                        src={user.profilePicture}
-                        alt={user.username}
-                      />
-                      <AvatarFallback>
-                        {user.username.charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <div className="font-medium">{user.username}</div>
-                      {user.fullName && (
-                        <div className="text-xs text-muted-foreground">
-                          {user.fullName}
-                        </div>
-                      )}
-                    </div>
-                  </Link>
-                ))}
-              </div>
+          <Link href="/feed" className="flex items-center gap-2">
+            <LaughIcon className="h-8 w-8 text-primary" />
+            {!isMobile && (
+              <span className="text-xl font-bold">ChuckleChain</span>
             )}
-          </div>
+          </Link>
         </div>
 
-        <nav className="flex items-center gap-3 md:gap-6">
-          <Link href="/feed">
+        {/* Center section with search */}
+        {!isMobile && (
+          <div className="flex-1 max-w-md mx-4">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search for users..."
+                className="w-full pl-8 md:w-full bg-secondary/50"
+                value={searchQuery}
+                onChange={handleSearchChange}
+                onFocus={() => setShowSearchResults(true)}
+                onBlur={() =>
+                  setTimeout(() => setShowSearchResults(false), 200)
+                }
+              />
+              {showSearchResults && searchResults.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg z-50 max-h-[300px] overflow-y-auto">
+                  {searchResults.map((user) => (
+                    <Link
+                      key={user.id}
+                      href={`/profile/${user.username}`}
+                      className="flex items-center gap-3 p-3 hover:bg-muted transition-colors"
+                    >
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage
+                          src={user.profilePicture}
+                          alt={user.username}
+                        />
+                        <AvatarFallback>
+                          {user.username.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <div className="font-medium">{user.username}</div>
+                        {user.fullName && (
+                          <div className="text-xs text-muted-foreground">
+                            {user.fullName}
+                          </div>
+                        )}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Right section with navigation icons */}
+        <nav className="flex items-center gap-4 md:gap-6">
+          {/* Mobile search toggle */}
+          {isMobile && (
             <Button
-              variant={pathname === "/feed" ? "default" : "ghost"}
+              variant="ghost"
               size="icon"
-              className="rounded-full transition-colors duration-300 hover:scale-105"
+              className="md:hidden"
+              onClick={() => setShowMobileSearch(!showMobileSearch)}
             >
-              <Home className="h-5 w-5" />
-              <span className="sr-only">Home</span>
+              <Search className="h-5 w-5" />
             </Button>
-          </Link>
+          )}
+
+          {!isMobile && (
+            <Link href="/feed">
+              <Button
+                variant={pathname === "/feed" ? "default" : "ghost"}
+                size="icon"
+                className="rounded-full"
+              >
+                <Home className="h-5 w-5" />
+                <span className="sr-only">Home</span>
+              </Button>
+            </Link>
+          )}
 
           <Link href="/messages">
             <Button
               variant={pathname === "/messages" ? "default" : "ghost"}
               size="icon"
-              className="rounded-full relative transition-colors duration-300 hover:scale-105"
+              className="rounded-full relative"
             >
               <MessageSquare className="h-5 w-5" />
               {unreadMessages > 0 && (
@@ -260,7 +382,7 @@ export function Navbar() {
             <Button
               variant={pathname === "/notifications" ? "default" : "ghost"}
               size="icon"
-              className="rounded-full relative transition-colors duration-300 hover:scale-105"
+              className="rounded-full relative"
             >
               <Bell className="h-5 w-5" />
               {unreadNotifications > 0 && (
@@ -272,19 +394,91 @@ export function Navbar() {
             </Button>
           </Link>
 
+          {/* Mobile right sidebar toggle */}
+          {isMobile && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden"
+              onClick={toggleRightSidebar}
+            >
+              <User className="h-5 w-5" />
+            </Button>
+          )}
+
           <ModeToggle />
 
-          <Button
-            variant="ghost"
-            size="icon"
-            className="rounded-full transition-colors duration-300 hover:scale-105"
-            onClick={handleLogout}
-          >
-            <LogOut className="h-5 w-5" />
-            <span className="sr-only">Log out</span>
-          </Button>
+          {/* Logout button - changed to icon */}
+          {!isMobile && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleLogout}
+              className="ml-2"
+            >
+              <LogOut className="h-5 w-5" />
+              <span className="sr-only">Logout</span>
+            </Button>
+          )}
         </nav>
       </div>
+
+      {/* Mobile search bar - only shown when search is active */}
+      {isMobile && showMobileSearch && (
+        <div className="px-4 py-2 border-b bg-background">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Search for users..."
+              className="w-full pl-8 pr-8 bg-secondary/50"
+              value={searchQuery}
+              onChange={handleSearchChange}
+              autoFocus
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-1 top-1 h-7 w-7"
+              onClick={() => setShowMobileSearch(false)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {/* Search results */}
+          {searchResults.length > 0 && (
+            <div className="mt-2 bg-background border rounded-md shadow-lg max-h-[300px] overflow-y-auto">
+              {searchResults.map((user) => (
+                <Link
+                  key={user.id}
+                  href={`/profile/${user.username}`}
+                  className="flex items-center gap-3 p-3 hover:bg-muted transition-colors"
+                  onClick={() => setShowMobileSearch(false)}
+                >
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage
+                      src={user.profilePicture}
+                      alt={user.username}
+                    />
+                    <AvatarFallback>
+                      {user.username.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <div className="font-medium">{user.username}</div>
+                    {user.fullName && (
+                      <div className="text-xs text-muted-foreground">
+                        {user.fullName}
+                      </div>
+                    )}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </header>
   );
 }
