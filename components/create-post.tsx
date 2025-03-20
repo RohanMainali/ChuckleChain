@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ImageIcon, X, AlertCircle } from "lucide-react";
+import { ImageIcon, X, AlertCircle, UserPlus } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import type { Post } from "@/lib/types";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -21,6 +21,20 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Badge } from "@/components/ui/badge";
 import axios from "axios";
 
 interface CreatePostProps {
@@ -52,9 +66,59 @@ export function CreatePost({ onPostCreated }: CreatePostProps) {
     "on-image" | "whitespace"
   >("on-image");
 
+  // User tagging state
+  const [taggedUsers, setTaggedUsers] = useState<
+    Array<{ id: string; username: string }>
+  >([]);
+  const [searchUsers, setSearchUsers] = useState<
+    Array<{ id: string; username: string; profilePicture: string }>
+  >([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showTagPopover, setShowTagPopover] = useState(false);
+
   const handleCaptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setCaption(e.target.value);
     if (error) setError(null);
+
+    // Check for @ symbol to trigger user search
+    const lastAtSymbol = e.target.value.lastIndexOf("@");
+    if (lastAtSymbol !== -1) {
+      const afterAt = e.target.value.substring(lastAtSymbol + 1);
+      const spaceAfterAt = afterAt.indexOf(" ");
+      const searchTerm =
+        spaceAfterAt === -1 ? afterAt : afterAt.substring(0, spaceAfterAt);
+
+      if (searchTerm.length > 0) {
+        searchForUsers(searchTerm);
+      }
+    }
+  };
+
+  const searchForUsers = async (query: string) => {
+    if (query.length < 2) return;
+
+    try {
+      const { data } = await axios.get(
+        `/api/users/search?q=${encodeURIComponent(query)}`
+      );
+      if (data.success) {
+        setSearchUsers(data.data);
+      }
+    } catch (error) {
+      console.error("Error searching for users:", error);
+    }
+  };
+
+  const handleTagUser = (selectedUser: { id: string; username: string }) => {
+    // Check if user is already tagged
+    if (!taggedUsers.some((user) => user.id === selectedUser.id)) {
+      setTaggedUsers([...taggedUsers, selectedUser]);
+    }
+    setShowTagPopover(false);
+  };
+
+  const removeTaggedUser = (userId: string) => {
+    setTaggedUsers(taggedUsers.filter((user) => user.id !== userId));
   };
 
   const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -133,6 +197,7 @@ export function CreatePost({ onPostCreated }: CreatePostProps) {
         category: category || undefined,
         memeTexts: captionPlacement === "on-image" ? [memeText] : undefined,
         captionPlacement: captionPlacement,
+        taggedUsers: taggedUsers.map((user) => user.id),
       };
 
       const { data } = await axios.post("/api/posts", postData);
@@ -142,6 +207,7 @@ export function CreatePost({ onPostCreated }: CreatePostProps) {
         setCaption("");
         setImage(null);
         setCategory(null);
+        setTaggedUsers([]);
         if (fileInputRef.current) {
           fileInputRef.current.value = "";
         }
@@ -172,6 +238,27 @@ export function CreatePost({ onPostCreated }: CreatePostProps) {
               className="min-h-[120px] resize-none border-none p-0 focus-visible:ring-0"
               rows={4}
             />
+
+            {/* Tagged users display */}
+            {taggedUsers.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {taggedUsers.map((taggedUser) => (
+                  <Badge
+                    key={taggedUser.id}
+                    variant="secondary"
+                    className="flex items-center gap-1"
+                  >
+                    @{taggedUser.username}
+                    <button
+                      onClick={() => removeTaggedUser(taggedUser.id)}
+                      className="ml-1 hover:text-destructive"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            )}
 
             {image && (
               <div className="mt-4 animate-fade-in">
@@ -234,6 +321,8 @@ export function CreatePost({ onPostCreated }: CreatePostProps) {
                               wordWrap: "break-word",
                               transform: "translate(-50%, -50%)",
                               whiteSpace: "pre-line", // This preserves line breaks
+                              position: "absolute", // Ensure absolute positioning
+                              zIndex: 10, // Make sure text is above the image
                             }}
                           >
                             {caption
@@ -329,7 +418,7 @@ export function CreatePost({ onPostCreated }: CreatePostProps) {
         </div>
       </CardContent>
       <CardFooter className="flex justify-between border-t px-6 py-3">
-        <div>
+        <div className="flex gap-2">
           <input
             type="file"
             accept="image/*"
@@ -345,6 +434,53 @@ export function CreatePost({ onPostCreated }: CreatePostProps) {
             <ImageIcon className="mr-2 h-4 w-4" />
             Add Image
           </Button>
+
+          {/* Tag User Button */}
+          <Popover open={showTagPopover} onOpenChange={setShowTagPopover}>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="sm">
+                <UserPlus className="mr-2 h-4 w-4" />
+                Tag User
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="p-0" align="start" side="top">
+              <Command>
+                <CommandInput
+                  placeholder="Search for users to tag..."
+                  onValueChange={searchForUsers}
+                />
+                <CommandList>
+                  <CommandEmpty>No users found</CommandEmpty>
+                  <CommandGroup>
+                    {searchUsers.map((user) => (
+                      <CommandItem
+                        key={user.id}
+                        value={user.username}
+                        onSelect={() =>
+                          handleTagUser({
+                            id: user.id,
+                            username: user.username,
+                          })
+                        }
+                        className="flex items-center gap-2 cursor-pointer"
+                      >
+                        <Avatar className="h-6 w-6">
+                          <AvatarImage
+                            src={user.profilePicture}
+                            alt={user.username}
+                          />
+                          <AvatarFallback>
+                            {user.username.charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span>@{user.username}</span>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
         </div>
         <Button
           onClick={handleCreatePost}
