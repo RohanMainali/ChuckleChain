@@ -39,6 +39,7 @@ export function Messages() {
   const [previewImage, setPreviewImage] = useState<string | null>(null)
   const [unreadConversations, setUnreadConversations] = useState<Set<string>>(new Set())
   const [newMessageAnimation, setNewMessageAnimation] = useState(false)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
 
   // Add these state variables after the existing ones:
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set())
@@ -715,7 +716,7 @@ export function Messages() {
 
   // Make the Messages component fully responsive with original design
   return (
-    <div className="grid h-[calc(100vh-5rem)] grid-cols-1 md:grid-cols-[320px_1fr] rounded-lg border bg-background text-foreground overflow-hidden">
+    <div className="messages-container grid grid-cols-1 md:grid-cols-[320px_1fr] rounded-lg border bg-background text-foreground overflow-hidden">
       {/* Conversations list - with a fixed header and scrollable content */}
       <div
         className={`flex flex-col border-b md:border-b-0 md:border-r border-gray-800/50 ${activeConversation && isMobile ? "hidden" : "block"}`}
@@ -810,7 +811,7 @@ export function Messages() {
             </Link>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 bg-transparent">
+          <div className="messages-content flex-1 overflow-y-auto p-4 bg-transparent" ref={messagesContainerRef}>
             <div className="space-y-3 pb-2">
               {activeConversation.messages.map((message, index) => {
                 // Message rendering logic remains the same
@@ -962,7 +963,7 @@ export function Messages() {
 
           {/* Reply indicator */}
           {replyingTo && (
-            <div className="flex-shrink-0 px-4 py-2 border-t border-gray-800/50 flex items-center gap-2 bg-black/20">
+            <div className="messages-input flex-shrink-0 px-4 py-2 border-t border-gray-800/50 flex items-center gap-2 bg-black/20">
               <div className="flex-1 border-l-2 border-indigo-600 pl-2 py-1">
                 <div className="flex items-center gap-1">
                   <Reply className="h-4 w-4 text-gray-400" />
@@ -985,7 +986,7 @@ export function Messages() {
 
           {/* Message input with image preview */}
           {messageImage && (
-            <div className="flex-shrink-0 px-4 py-2 border-t border-gray-800/50 bg-black/20">
+            <div className="messages-input flex-shrink-0 px-4 py-2 border-t border-gray-800/50 bg-black/20">
               <div className="relative inline-block">
                 <img
                   src={messageImage || "/placeholder.svg"}
@@ -1006,7 +1007,7 @@ export function Messages() {
 
           <form
             onSubmit={handleSendMessage}
-            className="flex-shrink-0 flex gap-2 border-t border-gray-800/50 p-4 bg-black/20"
+            className="messages-input flex-shrink-0 flex gap-2 border-t border-gray-800/50 p-4 bg-black/20"
           >
             <div className="relative flex-1">
               <Input
