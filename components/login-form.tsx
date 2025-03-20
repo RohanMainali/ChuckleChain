@@ -24,7 +24,7 @@ export function LoginForm() {
     password: "",
   })
 
-  // Signup form state
+  // Update the signup form state
   const [signupData, setSignupData] = useState({
     username: "",
     email: "",
@@ -34,6 +34,32 @@ export function LoginForm() {
 
   // Form errors
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  // Add this function to validate and format the username
+  const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+
+    // Convert to lowercase
+    const lowercaseValue = value.toLowerCase()
+
+    // Remove any characters that aren't lowercase letters, numbers, or underscores
+    const validValue = lowercaseValue.replace(/[^a-z0-9_]/g, "")
+
+    // Update the form state with the valid value
+    setSignupData({ ...signupData, username: validValue })
+
+    // Show error if the original input had invalid characters
+    if (value !== validValue) {
+      setErrors({
+        ...errors,
+        username: "Username can only contain lowercase letters, numbers, and underscores (_)",
+      })
+    } else {
+      // Clear the error if input is valid
+      const { username, ...remainingErrors } = errors
+      setErrors(remainingErrors)
+    }
+  }
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -53,9 +79,17 @@ export function LoginForm() {
     }
   }
 
+  // Update the handleSignupSubmit function to include additional validation
   const handleSignupSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+
+    // Validate username format
+    if (!/^[a-z0-9_]+$/.test(signupData.username)) {
+      setErrors({ username: "Username can only contain lowercase letters, numbers, and underscores (_)" })
+      setIsLoading(false)
+      return
+    }
 
     // Validate passwords match
     if (signupData.password !== signupData.confirmPassword) {
@@ -140,16 +174,19 @@ export function LoginForm() {
         <TabsContent value="signup">
           <form onSubmit={handleSignupSubmit}>
             <CardContent className="space-y-4 pt-4">
+              {/* Update the username input in the signup form */}
               <div className="space-y-2">
                 <Label htmlFor="signup-username">Username</Label>
                 <Input
                   id="signup-username"
                   placeholder="Choose a username"
                   value={signupData.username}
-                  onChange={(e) => setSignupData({ ...signupData, username: e.target.value })}
+                  onChange={handleUsernameChange}
                   required
-                  className="transition-all duration-300 focus:scale-102"
+                  className={`transition-all duration-300 focus:scale-102 ${errors.username ? "border-destructive" : ""}`}
                 />
+                {errors.username && <p className="text-sm text-destructive">{errors.username}</p>}
+                <p className="text-xs text-muted-foreground">Lowercase letters, numbers, and underscores only</p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
