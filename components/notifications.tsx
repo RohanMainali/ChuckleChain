@@ -322,6 +322,7 @@ export function Notifications() {
     }
   };
 
+  // Update the getNotificationText function to specify when a user is tagged in a comment
   const getNotificationText = (notification: Notification) => {
     switch (notification.type) {
       case "like":
@@ -346,12 +347,26 @@ export function Notifications() {
           </>
         );
       case "tag":
-        return (
-          <>
-            <span className="font-semibold">{notification.user.username}</span>{" "}
-            tagged you in a post
-          </>
-        );
+        // Check if this is a tag in a comment or in a post
+        if (notification.comment) {
+          return (
+            <>
+              <span className="font-semibold">
+                {notification.user.username}
+              </span>{" "}
+              mentioned you in a comment: "{notification.content}"
+            </>
+          );
+        } else {
+          return (
+            <>
+              <span className="font-semibold">
+                {notification.user.username}
+              </span>{" "}
+              tagged you in a post
+            </>
+          );
+        }
       case "comment_like":
         return (
           <>
