@@ -29,15 +29,7 @@ export function TrendingPage() {
     fetchTrendingPosts();
   }, []);
 
-  const handleDeletePost = async (postId: string) => {
-    try {
-      await axios.delete(`/api/posts/${postId}`);
-      setPosts(posts.filter((post) => post.id !== postId));
-    } catch (error) {
-      console.error("Error deleting post:", error);
-    }
-  };
-
+  // Update the handleLikePost function to handle post updates
   const handleLikePost = async (postId: string) => {
     try {
       const { data } = await axios.put(`/api/posts/${postId}/like`);
@@ -61,7 +53,15 @@ export function TrendingPage() {
     }
   };
 
-  // Update the handleAddComment function to properly handle refresh triggers
+  const handleDeletePost = async (postId: string) => {
+    try {
+      await axios.delete(`/api/posts/${postId}`);
+      setPosts(posts.filter((post) => post.id !== postId));
+    } catch (error) {
+      console.error("Error deleting post:", error);
+    }
+  };
+
   const handleAddComment = async (
     postId: string,
     comment: {
@@ -69,11 +69,22 @@ export function TrendingPage() {
       user: string;
       text: string;
       isRefreshTrigger?: boolean;
+      updatedPost?: PostType; // Add this property
     }
   ) => {
     // If this is just a refresh trigger, don't make an API call
     if (comment.isRefreshTrigger) {
-      // Create a new posts array to force a re-render
+      // If an updated post was provided, use it directly
+      if (comment.updatedPost) {
+        setPosts((currentPosts) => {
+          return currentPosts.map((post) =>
+            post.id === postId ? comment.updatedPost! : post
+          );
+        });
+        return;
+      }
+
+      // Otherwise, create a new posts array to force a re-render
       setPosts((currentPosts) => {
         // Find the post and create a new reference to trigger re-render
         return currentPosts.map((post) =>
