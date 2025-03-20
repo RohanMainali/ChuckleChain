@@ -1,261 +1,198 @@
-"use client";
+"use client"
 
-import type React from "react";
+import type React from "react"
 
-import { useState, useEffect } from "react";
-import Link from "next/link";
-import { useRouter, usePathname } from "next/navigation";
-import {
-  Bell,
-  Home,
-  LaughIcon,
-  MessageSquare,
-  Menu,
-  Search,
-  X,
-  User,
-  LogOut,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { useAuth } from "@/components/auth-provider";
-import { ModeToggle } from "@/components/mode-toggle";
-import { useMobile } from "@/hooks/use-mobile";
-import axios from "axios";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useState, useEffect } from "react"
+import Link from "next/link"
+import { useRouter, usePathname } from "next/navigation"
+import { Bell, Home, LaughIcon, MessageSquare, Menu, Search, X, User, LogOut } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { useAuth } from "@/components/auth-provider"
+import { ModeToggle } from "@/components/mode-toggle"
+import { useMobile } from "@/hooks/use-mobile"
+import axios from "axios"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 interface NavbarProps {
-  onMenuToggle: (open: boolean) => void;
-  sidebarOpen: boolean;
-  onRightSidebarToggle: (open: boolean) => void;
-  rightSidebarOpen: boolean;
+  onMenuToggle: (open: boolean) => void
+  sidebarOpen: boolean
+  onRightSidebarToggle: (open: boolean) => void
+  rightSidebarOpen: boolean
 }
 
-export function Navbar({
-  onMenuToggle,
-  sidebarOpen,
-  onRightSidebarToggle,
-  rightSidebarOpen,
-}: NavbarProps) {
-  const { user, logout } = useAuth();
-  const router = useRouter();
-  const pathname = usePathname();
-  const { isMobile } = useMobile();
-  const [unreadNotifications, setUnreadNotifications] = useState(0);
-  const [unreadMessages, setUnreadMessages] = useState(0);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [showSearchResults, setShowSearchResults] = useState(false);
-  const [showMobileSearch, setShowMobileSearch] = useState(false);
-  const [previousPath, setPreviousPath] = useState<string>("/feed");
+export function Navbar({ onMenuToggle, sidebarOpen, onRightSidebarToggle, rightSidebarOpen }: NavbarProps) {
+  const { user, logout } = useAuth()
+  const router = useRouter()
+  const pathname = usePathname()
+  const { isMobile } = useMobile()
+  const [unreadNotifications, setUnreadNotifications] = useState(0)
+  const [unreadMessages, setUnreadMessages] = useState(0)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [searchResults, setSearchResults] = useState<any[]>([])
+  const [showSearchResults, setShowSearchResults] = useState(false)
+  const [showMobileSearch, setShowMobileSearch] = useState(false)
+  const [previousPath, setPreviousPath] = useState<string>("/feed")
 
   const handleLogout = () => {
-    logout();
-    router.push("/");
-  };
+    logout()
+    router.push("/")
+  }
 
   const toggleSidebar = () => {
     if (onMenuToggle) {
       // Store current path before opening sidebar
       if (!sidebarOpen) {
-        setPreviousPath(pathname || "/feed");
+        setPreviousPath(pathname || "/feed")
       }
-      onMenuToggle(!sidebarOpen);
+      onMenuToggle(!sidebarOpen)
     }
-  };
+  }
 
   const toggleRightSidebar = () => {
     if (onRightSidebarToggle) {
-      onRightSidebarToggle(!rightSidebarOpen);
+      onRightSidebarToggle(!rightSidebarOpen)
     }
-  };
+  }
 
   // Fetch unread notification count
   useEffect(() => {
     const fetchUnreadCount = async () => {
       if (user) {
         try {
-          const { data } = await axios.get("/api/notifications/count");
+          const { data } = await axios.get("/api/notifications/count")
           if (data.success) {
-            setUnreadNotifications(data.data.count);
+            setUnreadNotifications(data.data.count)
           }
         } catch (error) {
-          console.error("Error fetching notification count:", error);
+          console.error("Error fetching notification count:", error)
         }
       }
-    };
+    }
 
-    fetchUnreadCount();
+    fetchUnreadCount()
 
     // Set up socket listener for new notifications
-    const socket = (window as any).socket;
+    const socket = (window as any).socket
     if (socket) {
       socket.on("newNotification", () => {
-        fetchUnreadCount();
-      });
+        fetchUnreadCount()
+      })
     }
 
     // Refresh count every minute
-    const interval = setInterval(fetchUnreadCount, 60000);
+    const interval = setInterval(fetchUnreadCount, 60000)
 
     return () => {
-      clearInterval(interval);
+      clearInterval(interval)
       if (socket) {
-        socket.off("newNotification");
+        socket.off("newNotification")
       }
-    };
-  }, [user]);
+    }
+  }, [user])
 
   // Add this useEffect after the existing useEffect for unread notifications
   useEffect(() => {
     const fetchUnreadMessages = async () => {
       if (user) {
         try {
-          const { data } = await axios.get("/api/messages/unread-count");
+          const { data } = await axios.get("/api/messages/unread-count")
           if (data.success) {
             // Now we're counting conversations with unread messages, not total messages
-            setUnreadMessages(data.data.conversationsWithUnread || 0);
+            setUnreadMessages(data.data.conversationsWithUnread || 0)
           }
         } catch (error) {
-          console.error("Error fetching unread messages count:", error);
+          console.error("Error fetching unread messages count:", error)
         }
       }
-    };
+    }
 
-    fetchUnreadMessages();
+    fetchUnreadMessages()
 
     // Set up socket listener for new messages
-    const socket = (window as any).socket;
+    const socket = (window as any).socket
     if (socket) {
       socket.on("newMessage", (message: any) => {
         // Only increment if this is from a different user
         if (message.senderId !== user?.id) {
           // We'll increment the count of conversations with unread messages
           // In a real app, we'd need to check if this is from a new conversation
-          setUnreadMessages((prev) => prev + 1);
+          setUnreadMessages((prev) => prev + 1)
         }
-      });
+      })
 
       // Add listener for updateUnreadCount event
       socket.on("updateUnreadCount", () => {
-        fetchUnreadMessages();
-      });
+        fetchUnreadMessages()
+      })
     }
 
     // Refresh count every minute
-    const interval = setInterval(fetchUnreadMessages, 60000);
+    const interval = setInterval(fetchUnreadMessages, 60000)
 
     return () => {
-      clearInterval(interval);
+      clearInterval(interval)
       if (socket) {
-        socket.off("newMessage");
-        socket.off("updateUnreadCount");
+        socket.off("newMessage")
+        socket.off("updateUnreadCount")
       }
-    };
-  }, [user]);
+    }
+  }, [user])
 
   // Update the socket connection to track user online status
-  const socket = (window as any).socket;
+  const socket = (window as any).socket
   useEffect(() => {
     // Update user's online status when the app is focused/blurred
     const handleVisibilityChange = () => {
       if (socket) {
         if (document.visibilityState === "visible") {
-          socket.emit("userActive");
-          console.log("User is active, emitting userActive event");
+          socket.emit("userActive")
+          console.log("User is active, emitting userActive event")
         } else {
-          socket.emit("userInactive");
-          console.log("User is inactive, emitting userInactive event");
+          socket.emit("userInactive")
+          console.log("User is inactive, emitting userInactive event")
         }
       }
-    };
+    }
 
-    document.addEventListener("visibilitychange", handleVisibilityChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange)
 
     // Clean up
     return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [socket]);
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+    }
+  }, [socket])
 
   const handleSearchChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const query = e.target.value;
-    setSearchQuery(query);
+    const query = e.target.value
+    setSearchQuery(query)
 
     if (query.trim().length < 2) {
-      setSearchResults([]);
-      return;
+      setSearchResults([])
+      return
     }
 
     try {
-      const { data } = await axios.get(
-        `/api/users/search?q=${encodeURIComponent(query)}`
-      );
+      const { data } = await axios.get(`/api/users/search?q=${encodeURIComponent(query)}`)
       if (data.success) {
-        setSearchResults(data.data);
+        setSearchResults(data.data)
       }
     } catch (error) {
-      console.error("Error searching users:", error);
+      console.error("Error searching users:", error)
     }
-  };
+  }
 
   useEffect(() => {
-    setSearchResults([]);
-    setSearchQuery("");
-    setShowSearchResults(false);
-    setShowMobileSearch(false);
-  }, [pathname]);
+    setSearchResults([])
+    setSearchQuery("")
+    setShowSearchResults(false)
+    setShowMobileSearch(false)
+  }, [pathname])
 
   // Handle swipe for mobile
   useEffect(() => {
-    if (!isMobile) return;
-
-    let touchStartX = 0;
-    let touchEndX = 0;
-
-    const handleTouchStart = (e: TouchEvent) => {
-      touchStartX = e.touches[0].clientX;
-    };
-
-    const handleTouchEnd = (e: TouchEvent) => {
-      touchEndX = e.changedTouches[0].clientX;
-      handleSwipe();
-    };
-
-    const handleSwipe = () => {
-      const currentPath = pathname || "";
-
-      // Right to left swipe (open messages from any page except messages)
-      if (
-        touchStartX - touchEndX > 100 &&
-        !currentPath.includes("/messages") &&
-        !sidebarOpen
-      ) {
-        router.push("/messages");
-      }
-
-      // Left to right swipe (open sidebar from any page)
-      if (touchEndX - touchStartX > 100 && !sidebarOpen) {
-        setPreviousPath(currentPath);
-        onMenuToggle(true);
-      }
-
-      // When sidebar is open: left swipe closes it and returns to previous page
-      if (sidebarOpen && touchStartX - touchEndX > 100) {
-        onMenuToggle(false);
-        // Go back to the page we were on before opening the sidebar
-        router.push(previousPath);
-      }
-    };
-
-    document.addEventListener("touchstart", handleTouchStart, false);
-    document.addEventListener("touchend", handleTouchEnd, false);
-
-    return () => {
-      document.removeEventListener("touchstart", handleTouchStart);
-      document.removeEventListener("touchend", handleTouchEnd);
-    };
-  }, [isMobile, router, onMenuToggle, pathname, sidebarOpen, previousPath]);
+    // Removed swipe gesture handling
+  }, [])
 
   return (
     <header className="sticky top-0 z-50 border-b bg-background">
@@ -264,25 +201,14 @@ export function Navbar({
         <div className="flex items-center">
           {/* Menu button for mobile */}
           {isMobile && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="mr-2 md:hidden"
-              onClick={toggleSidebar}
-            >
-              {sidebarOpen ? (
-                <X className="h-5 w-5" />
-              ) : (
-                <Menu className="h-5 w-5" />
-              )}
+            <Button variant="ghost" size="icon" className="mr-2 md:hidden" onClick={toggleSidebar}>
+              {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </Button>
           )}
 
           <Link href="/feed" className="flex items-center gap-2">
             <LaughIcon className="h-8 w-8 text-primary" />
-            {!isMobile && (
-              <span className="text-xl font-bold">ChuckleChain</span>
-            )}
+            {!isMobile && <span className="text-xl font-bold">ChuckleChain</span>}
           </Link>
         </div>
 
@@ -298,9 +224,7 @@ export function Navbar({
                 value={searchQuery}
                 onChange={handleSearchChange}
                 onFocus={() => setShowSearchResults(true)}
-                onBlur={() =>
-                  setTimeout(() => setShowSearchResults(false), 200)
-                }
+                onBlur={() => setTimeout(() => setShowSearchResults(false), 200)}
               />
               {showSearchResults && searchResults.length > 0 && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg z-50 max-h-[300px] overflow-y-auto">
@@ -311,21 +235,12 @@ export function Navbar({
                       className="flex items-center gap-3 p-3 hover:bg-muted transition-colors"
                     >
                       <Avatar className="h-8 w-8">
-                        <AvatarImage
-                          src={user.profilePicture}
-                          alt={user.username}
-                        />
-                        <AvatarFallback>
-                          {user.username.charAt(0).toUpperCase()}
-                        </AvatarFallback>
+                        <AvatarImage src={user.profilePicture} alt={user.username} />
+                        <AvatarFallback>{user.username.charAt(0).toUpperCase()}</AvatarFallback>
                       </Avatar>
                       <div>
                         <div className="font-medium">{user.username}</div>
-                        {user.fullName && (
-                          <div className="text-xs text-muted-foreground">
-                            {user.fullName}
-                          </div>
-                        )}
+                        {user.fullName && <div className="text-xs text-muted-foreground">{user.fullName}</div>}
                       </div>
                     </Link>
                   ))}
@@ -336,7 +251,7 @@ export function Navbar({
         )}
 
         {/* Right section with navigation icons */}
-        <nav className="flex items-center gap-4 md:gap-6">
+        <nav className="flex items-center gap-2 md:gap-6 ml-auto">
           {/* Mobile search toggle */}
           {isMobile && (
             <Button
@@ -351,11 +266,7 @@ export function Navbar({
 
           {!isMobile && (
             <Link href="/feed">
-              <Button
-                variant={pathname === "/feed" ? "default" : "ghost"}
-                size="icon"
-                className="rounded-full"
-              >
+              <Button variant={pathname === "/feed" ? "default" : "ghost"} size="icon" className="rounded-full">
                 <Home className="h-5 w-5" />
                 <span className="sr-only">Home</span>
               </Button>
@@ -396,12 +307,7 @@ export function Navbar({
 
           {/* Mobile right sidebar toggle */}
           {isMobile && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="md:hidden"
-              onClick={toggleRightSidebar}
-            >
+            <Button variant="ghost" size="icon" className="md:hidden" onClick={toggleRightSidebar}>
               <User className="h-5 w-5" />
             </Button>
           )}
@@ -410,12 +316,7 @@ export function Navbar({
 
           {/* Logout button - changed to icon */}
           {!isMobile && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleLogout}
-              className="ml-2"
-            >
+            <Button variant="ghost" size="icon" onClick={handleLogout} className="ml-2">
               <LogOut className="h-5 w-5" />
               <span className="sr-only">Logout</span>
             </Button>
@@ -457,21 +358,12 @@ export function Navbar({
                   onClick={() => setShowMobileSearch(false)}
                 >
                   <Avatar className="h-8 w-8">
-                    <AvatarImage
-                      src={user.profilePicture}
-                      alt={user.username}
-                    />
-                    <AvatarFallback>
-                      {user.username.charAt(0).toUpperCase()}
-                    </AvatarFallback>
+                    <AvatarImage src={user.profilePicture} alt={user.username} />
+                    <AvatarFallback>{user.username.charAt(0).toUpperCase()}</AvatarFallback>
                   </Avatar>
                   <div>
                     <div className="font-medium">{user.username}</div>
-                    {user.fullName && (
-                      <div className="text-xs text-muted-foreground">
-                        {user.fullName}
-                      </div>
-                    )}
+                    {user.fullName && <div className="text-xs text-muted-foreground">{user.fullName}</div>}
                   </div>
                 </Link>
               ))}
@@ -480,5 +372,6 @@ export function Navbar({
         </div>
       )}
     </header>
-  );
+  )
 }
+
