@@ -723,14 +723,13 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
                   {post.memeTexts.map((text, index) => (
                     <div
                       key={text.id || `meme-text-${index}`}
-                      className="absolute left-1/2 transform -translate-x-1/2 text-center select-none px-2 py-1"
+                      className="meme-text mobile-meme-text"
                       style={{
                         top: text.y + "%",
                         fontFamily: text.fontFamily,
                         fontSize: isMobile
                           ? `${Math.max(16, Math.floor(text.fontSize * 0.6))}px`
                           : `${text.fontSize}px`,
-                        lineHeight: "1.2",
                         color: text.color,
                         backgroundColor: text.backgroundColor !== "transparent" ? text.backgroundColor : "transparent",
                         textAlign: text.textAlign,
@@ -738,15 +737,6 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
                         fontStyle: text.italic ? "italic" : "normal",
                         textDecoration: text.underline ? "underline" : "none",
                         textTransform: text.uppercase ? "uppercase" : "none",
-                        textShadow: text.outline
-                          ? "-2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000"
-                          : "none",
-                        width: "90%",
-                        wordWrap: "break-word",
-                        transform: "translate(-50%, -50%)",
-                        whiteSpace: "pre-line",
-                        position: "absolute",
-                        zIndex: 10,
                       }}
                     >
                       {/* Show the edited text in the preview */}
@@ -836,12 +826,10 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
         {post.memeTexts.map((text, index) => (
           <div
             key={text.id || `meme-text-${index}`}
-            className="absolute left-1/2 transform -translate-x-1/2 text-center select-none px-2 py-1"
+            className={`meme-text mobile-meme-text ${text.y < 50 ? "meme-text-top" : "meme-text-bottom"}`}
             style={{
-              top: text.y + "%",
               fontFamily: text.fontFamily,
               fontSize: `${getMemeTextFontSize()}px`,
-              lineHeight: "1.2", // Added line height for better readability
               color: text.color,
               backgroundColor: text.backgroundColor !== "transparent" ? text.backgroundColor : "transparent",
               textAlign: text.textAlign,
@@ -849,13 +837,6 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
               fontStyle: text.italic ? "italic" : "normal",
               textDecoration: text.underline ? "underline" : "none",
               textTransform: text.uppercase ? "uppercase" : "none",
-              textShadow: text.outline ? "-2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000" : "none", // Stronger shadow
-              width: "90%", // Wider text area
-              wordWrap: "break-word",
-              transform: "translate(-50%, -50%)",
-              whiteSpace: "pre-line", // This preserves line breaks
-              position: "absolute", // Ensure absolute positioning
-              zIndex: 10, // Make sure text is above the image
             }}
           >
             {text.text.split("\n").map((line, i) => (
