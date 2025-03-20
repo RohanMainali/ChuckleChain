@@ -13,6 +13,8 @@ import {
   Tag,
   X,
   Edit2,
+  UserPlus,
+  AtSign,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardFooter, CardHeader } from "@/components/ui/card";
@@ -32,6 +34,19 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ShareDialog } from "@/components/share-dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import axios from "axios";
 import { toast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
@@ -84,6 +99,18 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
   const [editedText, setEditedText] = useState(post.text);
   const [isSaving, setIsSaving] = useState(false);
 
+  // User tagging state
+  const [taggedUsers, setTaggedUsers] = useState<
+    Array<{ id: string; username: string }>
+  >([]);
+  const [searchUsers, setSearchUsers] = useState<
+    Array<{ id: string; username: string; profilePicture: string }>
+  >([]);
+  const [showTagPopover, setShowTagPopover] = useState(false);
+  const [tagPopoverPosition, setTagPopoverPosition] = useState({ x: 0, y: 0 });
+  const [mentionSearch, setMentionSearch] = useState("");
+  const [showMentionPopover, setShowMentionPopover] = useState(false);
+
   const isCurrentUserPost = post.user.id === user?.id;
 
   const handleLike = () => {
@@ -104,6 +131,62 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
   const handleEdit = () => {
     setEditedText(post.text);
     setIsEditing(true);
+  };
+
+  // Search for users to tag
+  const searchForUsers = async (query: string) => {
+    if (query.length < 2) return;
+
+    try {
+      const { data } = await axios.get(
+        `/api/users/search?q=${encodeURIComponent(query)}`
+      );
+      if (data.success) {
+        setSearchUsers(data.data);
+      }
+    } catch (error) {
+      console.error("Error searching for users:", error);
+    }
+  };
+
+  // Handle tagging a user
+  const handleTagUser = (selectedUser: { id: string; username: string }) => {
+    // For comments, we'll insert the @username into the comment text
+    const newComment = comment + `@${selectedUser.username} `;
+    setComment(newComment);
+    setShowTagPopover(false);
+    setShowMentionPopover(false);
+
+    // Focus back on the input
+    setTimeout(() => {
+      if (commentInputRef.current) {
+        commentInputRef.current.focus();
+      }
+    }, 100);
+  };
+
+  // Handle comment input changes and detect @ mentions
+  const handleCommentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setComment(e.target.value);
+
+    // Check for @ symbol to trigger user search
+    const lastAtSymbol = e.target.value.lastIndexOf("@");
+    if (lastAtSymbol !== -1) {
+      const afterAt = e.target.value.substring(lastAtSymbol + 1);
+      const spaceAfterAt = afterAt.indexOf(" ");
+      const searchTerm =
+        spaceAfterAt === -1 ? afterAt : afterAt.substring(0, spaceAfterAt);
+
+      if (searchTerm.length > 0) {
+        setMentionSearch(searchTerm);
+        searchForUsers(searchTerm);
+        setShowMentionPopover(true);
+      } else {
+        setShowMentionPopover(false);
+      }
+    } else {
+      setShowMentionPopover(false);
+    }
   };
 
   // Update the handleSaveEdit function to properly update memeTexts if needed
@@ -202,6 +285,9 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
     if (!comment.trim()) return;
 
     try {
+      // Extract mentions from the comment
+      const mentions = extractMentions(comment);
+
       if (replyingTo) {
         // Create an optimistic reply to update the UI immediately
         const tempId = `temp-${Date.now()}`;
@@ -238,6 +324,7 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
 
           const { data } = await axios.post(endpoint, {
             text: comment,
+            mentions: mentions,
           });
 
           if (data.success) {
@@ -308,6 +395,7 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
           // Make the API call
           const { data } = await axios.post(`/api/posts/${post.id}/comments`, {
             text: comment,
+            mentions: mentions,
           });
 
           if (data.success) {
@@ -340,6 +428,7 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
       // Reset form regardless of success or failure
       setComment("");
       setReplyingTo(null);
+      setShowMentionPopover(false);
     } catch (error) {
       console.error("Error in comment handling:", error);
       toast({
@@ -348,6 +437,15 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
         variant: "destructive",
       });
     }
+  };
+
+  // Extract @mentions from text
+  const extractMentions = (text: string): string[] => {
+    const mentionRegex = /@(\w+)/g;
+    const matches = text.match(mentionRegex);
+    if (!matches) return [];
+
+    return matches.map((match) => match.substring(1)); // Remove the @ symbol
   };
 
   // Update the handleDeleteComment function to handle immediate deletions better
@@ -890,7 +988,10 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
                   >
                     {reply.user}
                   </Link>
-                  <div className="mt-1">{reply.text}</div>
+                  <div className="mt-1">
+                    {/* Format text to highlight mentions */}
+                    {formatTextWithMentions(reply.text)}
+                  </div>
 
                   {reply.user === user?.username && (
                     <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -949,6 +1050,53 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
             {renderCommentReplies(reply.id)}
           </div>
         ))}
+      </div>
+    );
+  };
+
+  // Format text to highlight mentions
+  const formatTextWithMentions = (text: string) => {
+    if (!text) return null;
+
+    const parts = text.split(/(@\w+)/g);
+    return parts.map((part, index) => {
+      if (part.startsWith("@")) {
+        const username = part.substring(1);
+        return (
+          <Link
+            key={index}
+            href={`/profile/${username}`}
+            className="text-primary hover:underline font-medium"
+          >
+            {part}
+          </Link>
+        );
+      }
+      return part;
+    });
+  };
+
+  // Display tagged users in post
+  const renderTaggedUsers = () => {
+    if (!post.taggedUsers || post.taggedUsers.length === 0) return null;
+
+    return (
+      <div className="px-4 py-2 border-t">
+        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+          <Tag className="h-3 w-3" />
+          <span>Tagged:</span>
+          {post.taggedUsers.map((taggedUser, index) => (
+            <React.Fragment key={taggedUser.id}>
+              <Link
+                href={`/profile/${taggedUser.username}`}
+                className="text-primary hover:underline"
+              >
+                @{taggedUser.username}
+              </Link>
+              {index < post.taggedUsers.length - 1 && ", "}
+            </React.Fragment>
+          ))}
+        </div>
       </div>
     );
   };
@@ -1021,6 +1169,9 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Tagged users section */}
+      {renderTaggedUsers()}
 
       <CardFooter className="flex flex-col p-0">
         {/* Likes and comments count - clean modern design */}
@@ -1119,7 +1270,10 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
                             >
                               {comment.user}
                             </Link>
-                            <div className="mt-1">{comment.text}</div>
+                            <div className="mt-1">
+                              {/* Format text to highlight mentions */}
+                              {formatTextWithMentions(comment.text)}
+                            </div>
 
                             {comment.user === user?.username && (
                               <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1224,10 +1378,10 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
                   <div className="relative">
                     <Input
                       ref={commentInputRef}
-                      placeholder="Write a comment..."
+                      placeholder="Write a comment... Use @ to mention users"
                       value={comment}
-                      onChange={(e) => setComment(e.target.value)}
-                      className="bg-muted border-0 focus-visible:ring-1 w-full"
+                      onChange={handleCommentChange}
+                      className="bg-muted border-0 focus-visible:ring-1 w-full pr-10"
                       onKeyDown={(e) => {
                         // Prevent Enter key from triggering the close button
                         if (e.key === "Enter" && !e.shiftKey) {
@@ -1238,17 +1392,106 @@ export function Post({ post, onDelete, onLike, onComment }: PostProps) {
                         }
                       }}
                     />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 rounded-full"
+                      onClick={() => setShowTagPopover(true)}
+                    >
+                      <AtSign className="h-4 w-4" />
+                    </Button>
+
+                    {/* Mention popover */}
+                    {showMentionPopover && searchUsers.length > 0 && (
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg z-50 max-h-[200px] overflow-y-auto">
+                        {searchUsers.map((user) => (
+                          <div
+                            key={user.id}
+                            className="flex items-center gap-2 p-2 hover:bg-muted cursor-pointer"
+                            onClick={() =>
+                              handleTagUser({
+                                id: user.id,
+                                username: user.username,
+                              })
+                            }
+                          >
+                            <Avatar className="h-6 w-6">
+                              <AvatarImage
+                                src={user.profilePicture}
+                                alt={user.username}
+                              />
+                              <AvatarFallback>
+                                {user.username.charAt(0).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span>@{user.username}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
-                  <Button
-                    type="submit"
-                    variant="ghost"
-                    size="sm"
-                    className="mt-2"
-                    disabled={!comment.trim()}
-                  >
-                    Post
-                  </Button>
+                  <div className="flex gap-2 mt-2">
+                    <Button
+                      type="submit"
+                      variant="ghost"
+                      size="sm"
+                      disabled={!comment.trim()}
+                    >
+                      Post
+                    </Button>
+
+                    {/* Tag user popover */}
+                    <Popover
+                      open={showTagPopover}
+                      onOpenChange={setShowTagPopover}
+                    >
+                      <PopoverTrigger asChild>
+                        <Button variant="ghost" size="sm" type="button">
+                          <UserPlus className="h-4 w-4 mr-1" />
+                          Tag
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="p-0" align="start">
+                        <Command>
+                          <CommandInput
+                            placeholder="Search for users to tag..."
+                            onValueChange={searchForUsers}
+                          />
+                          <CommandList>
+                            <CommandEmpty>No users found</CommandEmpty>
+                            <CommandGroup>
+                              {searchUsers.map((user) => (
+                                <CommandItem
+                                  key={user.id}
+                                  value={user.username}
+                                  onSelect={() =>
+                                    handleTagUser({
+                                      id: user.id,
+                                      username: user.username,
+                                    })
+                                  }
+                                  className="flex items-center gap-2 cursor-pointer"
+                                >
+                                  <Avatar className="h-6 w-6">
+                                    <AvatarImage
+                                      src={user.profilePicture}
+                                      alt={user.username}
+                                    />
+                                    <AvatarFallback>
+                                      {user.username.charAt(0).toUpperCase()}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <span>@{user.username}</span>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
                 </div>
               </div>
             </form>
