@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/command";
 import { Badge } from "@/components/ui/badge";
 import axios from "axios";
+import { useMediaQuery } from "@/hooks/use-media-query";
 
 interface CreatePostProps {
   onPostCreated: (post: Post) => void;
@@ -65,6 +66,7 @@ export function CreatePost({ onPostCreated }: CreatePostProps) {
   const [captionPlacement, setCaptionPlacement] = useState<
     "on-image" | "whitespace"
   >("on-image");
+  const isMobile = useMediaQuery("(max-width: 768px)");
 
   // User tagging state
   const [taggedUsers, setTaggedUsers] = useState<
@@ -75,6 +77,12 @@ export function CreatePost({ onPostCreated }: CreatePostProps) {
   >([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [showTagPopover, setShowTagPopover] = useState(false);
+
+  // Mobile optimization for the create post component
+  // Adjust textarea size for mobile screens
+  const textareaStyle = isMobile
+    ? "min-h-[100px] resize-none border-none p-0 focus-visible:ring-0 text-base"
+    : "min-h-[120px] resize-none border-none p-0 focus-visible:ring-0";
 
   const handleCaptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setCaption(e.target.value);
@@ -138,7 +146,8 @@ export function CreatePost({ onPostCreated }: CreatePostProps) {
     }
   };
 
-  const handleRemoveImage = () => {
+  const handleRemoveImage = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent event bubbling
     setImage(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -177,7 +186,7 @@ export function CreatePost({ onPostCreated }: CreatePostProps) {
           text: caption,
           x: 50,
           y: textPosition === "top" ? 10 : 85, // Adjusted bottom position to prevent overflow
-          fontSize: 36, // Increased font size to match the preview
+          fontSize: 24, // Reduced font size to prevent overflow
           fontFamily: "Impact, sans-serif",
           color: "#FFFFFF",
           backgroundColor: "transparent",
@@ -235,8 +244,8 @@ export function CreatePost({ onPostCreated }: CreatePostProps) {
               placeholder="What's on your mind? (Press Enter for new lines)"
               value={caption}
               onChange={handleCaptionChange}
-              className="min-h-[120px] resize-none border-none p-0 focus-visible:ring-0"
-              rows={4}
+              className={textareaStyle}
+              rows={isMobile ? 3 : 4}
             />
 
             {/* Tagged users display */}
@@ -267,13 +276,15 @@ export function CreatePost({ onPostCreated }: CreatePostProps) {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="absolute right-2 top-2 z-10 rounded-full bg-background/80"
+                      className="absolute right-2 top-2 z-50 rounded-full bg-background/80 shadow-md"
                       onClick={handleRemoveImage}
+                      aria-label="Remove image"
                     >
                       <X className="h-4 w-4" />
                     </Button>
 
-                    <div className="relative">
+                    <div className="relative w-full max-w-full overflow-hidden">
+                      {/* Add responsive classes */}
                       {captionPlacement === "whitespace" ? (
                         <div className="flex flex-col overflow-hidden rounded-md">
                           <div className="bg-white p-3 text-center border-b">
@@ -307,22 +318,23 @@ export function CreatePost({ onPostCreated }: CreatePostProps) {
                             className="w-full rounded-md"
                           />
                           <div
-                            className="absolute left-1/2 transform -translate-x-1/2 text-center select-none px-2 py-1"
+                            className="absolute left-1/2 transform -translate-x-1/2 text-center select-none px-2 py-1 w-[90%]"
                             style={{
                               top: textPosition === "top" ? "10%" : "85%", // Adjusted bottom position to prevent overflow
                               fontFamily: "Impact, sans-serif",
-                              fontSize: "36px", // Increased font size
+                              fontSize: "24px", // Reduced font size to prevent overflow
                               lineHeight: "1.2", // Added line height for better readability
                               color: "#FFFFFF",
                               textTransform: "uppercase",
                               textShadow:
                                 "-2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000", // Stronger text shadow
-                              width: "90%", // Wider text area
                               wordWrap: "break-word",
                               transform: "translate(-50%, -50%)",
                               whiteSpace: "pre-line", // This preserves line breaks
                               position: "absolute", // Ensure absolute positioning
                               zIndex: 10, // Make sure text is above the image
+                              maxHeight: "80%", // Limit height to prevent overflow
+                              overflow: "hidden", // Hide overflow text
                             }}
                           >
                             {caption
@@ -344,67 +356,88 @@ export function CreatePost({ onPostCreated }: CreatePostProps) {
                     </div>
                   </div>
 
-                  {/* Caption placement control */}
-                  <div className="border rounded-md p-4">
-                    <Label className="mb-2 block">Caption Style</Label>
-                    <RadioGroup
-                      value={captionPlacement}
-                      onValueChange={(value) =>
-                        setCaptionPlacement(value as "on-image" | "whitespace")
-                      }
-                      className="flex gap-4"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="on-image" id="on-image" />
-                        <Label htmlFor="on-image">Overlay Text</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="whitespace" id="whitespace" />
-                        <Label htmlFor="whitespace">White Header</Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  {/* Only show text position control when caption is on the image */}
-                  {captionPlacement === "on-image" && (
+                  {/* Stack controls vertically on mobile */}
+                  <div
+                    className={`${
+                      isMobile
+                        ? "grid grid-cols-1 gap-2"
+                        : "flex flex-col gap-4"
+                    }`}
+                  >
+                    {/* Caption placement control */}
                     <div className="border rounded-md p-4">
-                      <Label className="mb-2 block">Text Position</Label>
+                      <Label className="mb-2 block">Caption Style</Label>
                       <RadioGroup
-                        value={textPosition}
+                        value={captionPlacement}
                         onValueChange={(value) =>
-                          setTextPosition(value as "top" | "bottom")
+                          setCaptionPlacement(
+                            value as "on-image" | "whitespace"
+                          )
                         }
                         className="flex gap-4"
                       >
                         <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="top" id="top" />
-                          <Label htmlFor="top">Top</Label>
+                          <RadioGroupItem value="on-image" id="on-image" />
+                          <Label htmlFor="on-image">Overlay Text</Label>
                         </div>
                         <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="bottom" id="bottom" />
-                          <Label htmlFor="bottom">Bottom</Label>
+                          <RadioGroupItem value="whitespace" id="whitespace" />
+                          <Label htmlFor="whitespace">White Header</Label>
                         </div>
                       </RadioGroup>
                     </div>
-                  )}
+
+                    {/* Only show text position control when caption is on the image */}
+                    {captionPlacement === "on-image" && (
+                      <div className="border rounded-md p-4">
+                        <Label className="mb-2 block">Text Position</Label>
+                        <RadioGroup
+                          value={textPosition}
+                          onValueChange={(value) =>
+                            setTextPosition(value as "top" | "bottom")
+                          }
+                          className="flex gap-4"
+                        >
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="top" id="top" />
+                            <Label htmlFor="top">Top</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="bottom" id="bottom" />
+                            <Label htmlFor="bottom">Bottom</Label>
+                          </div>
+                        </RadioGroup>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Category selection */}
+                  <div className="mt-4">
+                    <Label htmlFor="category">Category (optional)</Label>
+                    <Select value={category || ""} onValueChange={setCategory}>
+                      <SelectTrigger id="category">
+                        <SelectValue placeholder="Select a category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((cat) => (
+                          <SelectItem key={cat.value} value={cat.value}>
+                            {cat.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
-                {/* Category selection */}
-                <div className="mt-4">
-                  <Label htmlFor="category">Category (optional)</Label>
-                  <Select value={category || ""} onValueChange={setCategory}>
-                    <SelectTrigger id="category">
-                      <SelectValue placeholder="Select a category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((cat) => (
-                        <SelectItem key={cat.value} value={cat.value}>
-                          {cat.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {error && (
+                  <Alert
+                    variant="destructive"
+                    className="mt-3 animate-slide-up"
+                  >
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
               </div>
             )}
 
@@ -418,7 +451,7 @@ export function CreatePost({ onPostCreated }: CreatePostProps) {
         </div>
       </CardContent>
       <CardFooter className="flex justify-between border-t px-6 py-3">
-        <div className="flex gap-2">
+        <div className="flex gap-4">
           <input
             type="file"
             accept="image/*"
@@ -428,19 +461,22 @@ export function CreatePost({ onPostCreated }: CreatePostProps) {
           />
           <Button
             variant="ghost"
-            size="sm"
+            size="icon"
+            className="mobile-touch-target"
             onClick={() => fileInputRef.current?.click()}
           >
-            <ImageIcon className="mr-2 h-4 w-4" />
-            Add Image
+            <ImageIcon className="h-5 w-5" />
           </Button>
 
           {/* Tag User Button */}
           <Popover open={showTagPopover} onOpenChange={setShowTagPopover}>
             <PopoverTrigger asChild>
-              <Button variant="ghost" size="sm">
-                <UserPlus className="mr-2 h-4 w-4" />
-                Tag User
+              <Button
+                variant="ghost"
+                size="icon"
+                className="mobile-touch-target"
+              >
+                <UserPlus className="h-5 w-5" />
               </Button>
             </PopoverTrigger>
             <PopoverContent className="p-0" align="start" side="top">
@@ -485,7 +521,7 @@ export function CreatePost({ onPostCreated }: CreatePostProps) {
         <Button
           onClick={handleCreatePost}
           disabled={isCreating}
-          className="transition-all duration-300 hover:scale-105"
+          className="transition-all duration-300 hover:scale-105 bg-primary text-primary-foreground"
         >
           {isCreating ? (
             <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent"></div>
