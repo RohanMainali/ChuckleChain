@@ -13,6 +13,7 @@ import {
   Reply,
   X,
   Check,
+  ArrowLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +38,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { useMediaQuery } from "@/hooks/use-media-query";
 
 // Initialize socket connection
 let socket: any;
@@ -73,6 +75,7 @@ export function Messages() {
   // Initialize router at the beginning of the component
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { isMobile } = useMediaQuery();
 
   // Check for shared post in URL
   const sharedPostId = searchParams?.get("share");
@@ -452,9 +455,12 @@ export function Messages() {
   // Scroll to bottom when new messages are added, but use a fade-in animation instead
   useEffect(() => {
     if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "auto" });
+      messagesEndRef.current.scrollIntoView({
+        behavior: isMobile ? "auto" : "smooth",
+        block: "end",
+      });
     }
-  }, [activeConversation?.messages]);
+  }, [activeConversation?.messages, isMobile]);
 
   // Update the handleSendMessage function to ensure images are properly stored
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -757,11 +763,15 @@ export function Messages() {
     );
   }
 
-  // Change the main container from flex to grid layout for better control over scrolling
+  // Make the Messages component fully responsive with original design
   return (
-    <div className="grid h-[calc(100vh-5rem)] grid-cols-1 md:grid-cols-[320px_1fr] rounded-lg border bg-gradient-to-br from-gray-950 to-gray-900 text-white overflow-hidden">
+    <div className="grid h-[calc(100vh-5rem)] grid-cols-1 md:grid-cols-[320px_1fr] rounded-lg border bg-background text-foreground overflow-hidden">
       {/* Conversations list - with a fixed header and scrollable content */}
-      <div className="flex flex-col border-b md:border-b-0 md:border-r border-gray-800/50">
+      <div
+        className={`flex flex-col border-b md:border-b-0 md:border-r border-gray-800/50 ${
+          activeConversation && isMobile ? "hidden" : "block"
+        }`}
+      >
         <div className="p-4 border-b border-gray-800/50 bg-black/20">
           <h2 className="text-xl font-bold">Messages</h2>
         </div>
@@ -842,8 +852,22 @@ export function Messages() {
 
       {/* Active conversation - with fixed layout for header, messages area and input */}
       {activeConversation ? (
-        <div className="flex flex-col h-full overflow-hidden">
+        <div
+          className={`flex flex-col h-full overflow-hidden ${
+            !activeConversation && isMobile ? "hidden" : "block"
+          }`}
+        >
           <div className="flex-shrink-0 flex items-center gap-3 border-b border-gray-800/50 p-4 bg-black/20">
+            {isMobile && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setActiveConversation(null)}
+                className="mr-2"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+            )}
             <Link
               href={`/profile/${activeConversation.user.username}`}
               className="flex items-center gap-3 hover:opacity-90 transition-opacity"
@@ -1157,7 +1181,7 @@ export function Messages() {
               type="submit"
               size="icon"
               disabled={(!newMessage.trim() && !messageImage) || isUploading}
-              className="bg-indigo-600 hover:bg-indigo-700 transition-all duration-300 hover:scale-110 rounded-full"
+              className="bg-indigo-600 hover:bg-indigo-700 transition-all duration-300 hover:scale-110 rounded-full mobile-touch-target"
             >
               {isUploading ? (
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
@@ -1168,11 +1192,13 @@ export function Messages() {
           </form>
         </div>
       ) : (
-        <div className="flex flex-1 flex-col items-center justify-center p-4 text-center bg-transparent">
-          <h3 className="text-lg font-medium">No conversation selected</h3>
-          <p className="text-gray-400">
-            Select a conversation from the list to start chatting
-          </p>
+        <div className="flex flex-1 items-center justify-center h-full bg-transparent md:flex hidden">
+          <div className="text-center">
+            <h3 className="text-lg font-medium">No conversation selected</h3>
+            <p className="text-gray-400">
+              Select a conversation from the list to start chatting
+            </p>
+          </div>
         </div>
       )}
 
