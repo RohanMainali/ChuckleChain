@@ -14,11 +14,13 @@ import {
   UserPlus,
   RefreshCw,
   AtSign,
+  CheckCheck,
 } from "lucide-react";
 import axios from "axios";
 import io from "socket.io-client";
 import { useAuth } from "@/components/auth-provider";
 import { toast } from "@/hooks/use-toast";
+import { useMobile } from "@/hooks/use-mobile";
 
 // Initialize socket connection
 let socket: any;
@@ -26,6 +28,7 @@ let socket: any;
 export function Notifications() {
   const { user } = useAuth();
   const router = useRouter();
+  const { isMobile } = useMobile();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -203,6 +206,10 @@ export function Notifications() {
           read: true,
         }))
       );
+      toast({
+        title: "Success",
+        description: "All notifications marked as read",
+      });
     } catch (error) {
       console.error("Error marking all notifications as read:", error);
       toast({
@@ -401,13 +408,25 @@ export function Notifications() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Notifications</h1>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleRefresh}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            className="rounded-full flex items-center justify-center"
+          >
+            <RefreshCw className="h-4 w-4 md:mr-2" />
+            <span className="hidden md:inline">Refresh</span>
           </Button>
           {notifications.length > 0 && (
-            <Button variant="outline" size="sm" onClick={handleMarkAllAsRead}>
-              Mark all as read
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleMarkAllAsRead}
+              className="rounded-full flex items-center justify-center"
+              title="Mark all as read"
+            >
+              <CheckCheck className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">Mark all</span>
             </Button>
           )}
         </div>
@@ -442,7 +461,7 @@ export function Notifications() {
                 {notifications.map((notification, index) => (
                   <div
                     key={notification.id}
-                    className={`flex items-start gap-4 p-4 hover:bg-muted/50 cursor-pointer animate-slide-up ${
+                    className={`flex items-start gap-3 p-4 hover:bg-muted/50 cursor-pointer animate-slide-up ${
                       !notification.read ? "bg-muted/30" : ""
                     }`}
                     style={{ animationDelay: `${Math.min(index, 10) * 0.05}s` }}
@@ -452,9 +471,9 @@ export function Notifications() {
                       {getNotificationIcon(notification.type)}
                     </div>
 
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <Avatar className="h-8 w-8">
+                        <Avatar className="h-8 w-8 flex-shrink-0">
                           <AvatarImage
                             src={notification.user.profilePicture}
                             alt={notification.user.username}
@@ -463,12 +482,12 @@ export function Notifications() {
                             {notification.user.username.charAt(0).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
-                        <p className="break-words">
+                        <p className="break-words text-sm md:text-base">
                           {getNotificationText(notification)}
                         </p>
                       </div>
 
-                      <div className="mt-1 text-xs text-muted-foreground">
+                      <div className="mt-1 text-xs md:text-sm text-muted-foreground">
                         {formatDistanceToNow(new Date(notification.timestamp), {
                           addSuffix: true,
                         })}
@@ -487,37 +506,50 @@ export function Notifications() {
                               notification.id
                             );
                           }}
-                          className="bg-primary text-primary-foreground hover:bg-primary/90"
+                          className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full text-xs px-2 py-1 h-auto"
                         >
-                          <UserPlus className="mr-2 h-4 w-4" />
-                          Follow Back
+                          <UserPlus className="mr-1 h-3 w-3" />
+                          <span className="hidden md:inline">Follow Back</span>
+                          <span className="md:hidden">Follow</span>
                         </Button>
                       )}
 
                     {notification.type === "follow" &&
                       notification.userFollowedBack && (
-                        <Button variant="outline" size="sm" disabled>
-                          Following
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled
+                          className="rounded-full text-xs px-2 py-1 h-auto"
+                        >
+                          <span className="hidden md:inline">Following</span>
+                          <span className="md:hidden">✓</span>
                         </Button>
                       )}
                   </div>
                 ))}
 
                 {hasMore && (
-                  <div className="p-4 flex justify-center">
+                  <div className="p-3 flex justify-center">
                     <Button
                       variant="outline"
                       onClick={handleLoadMore}
                       disabled={loadingMore}
-                      className="w-full"
+                      className="w-full rounded-full"
                     >
                       {loadingMore ? (
                         <>
                           <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
-                          Loading more...
+                          <span className="hidden md:inline">
+                            Loading more...
+                          </span>
+                          <span className="md:hidden">Loading...</span>
                         </>
                       ) : (
-                        "Load More"
+                        <>
+                          <span className="hidden md:inline">Load More</span>
+                          <span className="md:hidden">More</span>
+                        </>
                       )}
                     </Button>
                   </div>
