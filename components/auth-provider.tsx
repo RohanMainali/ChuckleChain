@@ -6,9 +6,10 @@ import { createContext, useContext, useState, useEffect } from "react"
 import type { User } from "@/lib/types"
 import axios from "axios"
 
-// Configure axios
-axios.defaults.baseURL = "http://localhost:5001"
+// Update the axios configuration to use environment variables
+axios.defaults.baseURL = process.env.NEXT_PUBLIC_API_URL || "https://chucklechain-api.onrender.com"
 axios.defaults.withCredentials = true
+axios.defaults.timeout = 10000 // 10 second timeout
 
 type AuthContextType = {
   user: User | null
