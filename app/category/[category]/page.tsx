@@ -8,4 +8,3 @@ export default function CategoryPageRoute({ params }: { params: { category: stri
     </MainLayout>
   )
 }
-
