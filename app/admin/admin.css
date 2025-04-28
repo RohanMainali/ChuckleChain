@@ -1,0 +1,15 @@
+/* Admin-specific styles */
+html,
+body {
+  height: 100%;
+  overflow: auto;
+}
+
+.admin-content {
+  overflow-y: auto;
+  max-height: calc(100vh - 64px); /* 64px is header height */
+}
+
+.admin-table-container {
+  overflow-x: auto;
+}

@@ -5,6 +5,7 @@ import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/components/auth-provider"
 import { MobileProvider } from "@/hooks/use-mobile"
+import { SidebarProvider } from "@/context/SidebarContext"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -26,11 +27,12 @@ export default function RootLayout({
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <MobileProvider>
-            <AuthProvider>{children}</AuthProvider>
+            <SidebarProvider>
+              <AuthProvider>{children}</AuthProvider>
+            </SidebarProvider>
           </MobileProvider>
         </ThemeProvider>
       </body>
     </html>
   )
 }
-

@@ -1,119 +1,138 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Search, Send, LinkIcon, Copy, Check, Share2 } from "lucide-react"
-import { useAuth } from "@/components/auth-provider"
-import { toast } from "@/hooks/use-toast"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Separator } from "@/components/ui/separator"
-import axios from "axios"
-import type { Post } from "@/lib/types"
+import { useState, useEffect } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Search, Send, LinkIcon, Copy, Check, Share2 } from "lucide-react";
+import { useAuth } from "@/components/auth-provider";
+import { toast } from "@/hooks/use-toast";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
+import axios from "axios";
+import type { Post } from "@/lib/types";
 
 interface ShareDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  post: Post
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  post: Post;
 }
 
 interface User {
-  id: string
-  username: string
-  profilePicture: string
-  isFollowing?: boolean
+  id: string;
+  username: string;
+  profilePicture: string;
+  isFollowing?: boolean;
 }
 
 export function ShareDialog({ open, onOpenChange, post }: ShareDialogProps) {
-  const { user } = useAuth()
-  const [searchQuery, setSearchQuery] = useState("")
-  const [connections, setConnections] = useState<User[]>([])
-  const [filteredConnections, setFilteredConnections] = useState<User[]>([])
-  const [selectedUsers, setSelectedUsers] = useState<string[]>([])
-  const [loading, setLoading] = useState(true)
-  const [sharing, setSharing] = useState(false)
-  const [copied, setCopied] = useState(false)
-  const [activeTab, setActiveTab] = useState("direct")
-  const [message, setMessage] = useState(`Check out this meme!`)
+  const { user } = useAuth();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [connections, setConnections] = useState<User[]>([]);
+  const [filteredConnections, setFilteredConnections] = useState<User[]>([]);
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sharing, setSharing] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [activeTab, setActiveTab] = useState("direct");
+  const [message, setMessage] = useState(`Check out this meme!`);
 
   // Generate post URL
-  const postUrl = typeof window !== "undefined" ? `${window.location.origin}/post/${post.id}` : `/post/${post.id}`
+  const postUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/post/${post.id}`
+      : `/post/${post.id}`;
 
   // Fetch user's connections (followers and following)
   useEffect(() => {
     const fetchConnections = async () => {
-      if (!user || !open) return
+      if (!user || !open) return;
 
       try {
-        setLoading(true)
+        setLoading(true);
         // Get both followers and following
         const [followersRes, followingRes] = await Promise.all([
           axios.get(`/api/users/${user.username}/followers`),
           axios.get(`/api/users/${user.username}/following`),
-        ])
+        ]);
 
         if (followersRes.data.success && followingRes.data.success) {
           // Combine and deduplicate connections
-          const allConnections = [...followersRes.data.data, ...followingRes.data.data]
-          const uniqueConnections = Array.from(new Map(allConnections.map((conn) => [conn.id, conn])).values())
-          setConnections(uniqueConnections)
-          setFilteredConnections(uniqueConnections)
+          const allConnections = [
+            ...followersRes.data.data,
+            ...followingRes.data.data,
+          ];
+          const uniqueConnections = Array.from(
+            new Map(allConnections.map((conn) => [conn.id, conn])).values()
+          );
+          setConnections(uniqueConnections);
+          setFilteredConnections(uniqueConnections);
         }
       } catch (error) {
-        console.error("Error fetching connections:", error)
+        console.error("Error fetching connections:", error);
         toast({
           title: "Error",
           description: "Failed to load your connections",
           variant: "destructive",
-        })
+        });
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
-    fetchConnections()
-  }, [user, open])
+    fetchConnections();
+  }, [user, open]);
 
   // Filter connections based on search query
   useEffect(() => {
     if (searchQuery.trim() === "") {
-      setFilteredConnections(connections)
+      setFilteredConnections(connections);
     } else {
-      const filtered = connections.filter((conn) => conn.username.toLowerCase().includes(searchQuery.toLowerCase()))
-      setFilteredConnections(filtered)
+      const filtered = connections.filter((conn) =>
+        conn.username.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredConnections(filtered);
     }
-  }, [searchQuery, connections])
+  }, [searchQuery, connections]);
 
   // Reset state when dialog closes
   useEffect(() => {
     if (!open) {
-      setSelectedUsers([])
-      setSearchQuery("")
-      setMessage(`Check out this meme!`)
-      setCopied(false)
-      setActiveTab("direct")
+      setSelectedUsers([]);
+      setSearchQuery("");
+      setMessage(`Check out this meme!`);
+      setCopied(false);
+      setActiveTab("direct");
     }
-  }, [open])
+  }, [open]);
 
   const toggleUserSelection = (userId: string) => {
-    setSelectedUsers((prev) => (prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]))
-  }
+    setSelectedUsers((prev) =>
+      prev.includes(userId)
+        ? prev.filter((id) => id !== userId)
+        : [...prev, userId]
+    );
+  };
 
   const handleCopyLink = () => {
-    navigator.clipboard.writeText(postUrl)
-    setCopied(true)
+    navigator.clipboard.writeText(postUrl);
+    setCopied(true);
     toast({
       title: "Link copied",
       description: "Post link copied to clipboard",
-    })
+    });
 
     setTimeout(() => {
-      setCopied(false)
-    }, 2000)
-  }
+      setCopied(false);
+    }, 2000);
+  };
 
   const handleShareViaMessages = async () => {
     if (selectedUsers.length === 0) {
@@ -121,80 +140,93 @@ export function ShareDialog({ open, onOpenChange, post }: ShareDialogProps) {
         title: "No recipients selected",
         description: "Please select at least one person to share with",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
-    setSharing(true)
+    setSharing(true);
     try {
       // Create direct messages to each selected user
       const promises = selectedUsers.map(async (recipientId) => {
         try {
           // First get or create a conversation with this user
-          const convResponse = await axios.get(`/api/messages/conversations/${recipientId}`)
-          const conversationId = convResponse.data.data.id
+          const convResponse = await axios.get(
+            `/api/messages/conversations/${recipientId}`
+          );
+          const conversationId = convResponse.data.data.id;
 
           // Then send a message with the post link
           return axios.post(`/api/messages/${conversationId}`, {
             text: `${message} ${postUrl}`,
-          })
+          });
         } catch (err) {
-          console.error(`Error sharing with user ${recipientId}:`, err)
-          return Promise.reject(err)
+          console.error(`Error sharing with user ${recipientId}:`, err);
+          return Promise.reject(err);
         }
-      })
+      });
 
-      await Promise.all(promises)
+      await Promise.all(promises);
 
       toast({
         title: "Meme shared",
-        description: `Shared with ${selectedUsers.length} ${selectedUsers.length === 1 ? "person" : "people"}`,
-      })
+        description: `Shared with ${selectedUsers.length} ${
+          selectedUsers.length === 1 ? "person" : "people"
+        }`,
+      });
 
-      onOpenChange(false)
+      onOpenChange(false);
     } catch (error) {
-      console.error("Error sharing post:", error)
+      console.error("Error sharing post:", error);
       toast({
         title: "Error",
         description: "Failed to share the meme. Please try again.",
         variant: "destructive",
-      })
+      });
     } finally {
-      setSharing(false)
+      setSharing(false);
     }
-  }
+  };
 
   const handleShareToSocial = (platform: string) => {
-    let shareUrl = ""
+    let shareUrl = "";
 
     switch (platform) {
       case "twitter":
-        shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(message)}&url=${encodeURIComponent(postUrl)}`
-        break
+        shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(
+          message
+        )}&url=${encodeURIComponent(postUrl)}`;
+        break;
       case "facebook":
-        shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(postUrl)}`
-        break
+        shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
+          postUrl
+        )}`;
+        break;
       case "whatsapp":
-        shareUrl = `https://wa.me/?text=${encodeURIComponent(`${message} ${postUrl}`)}`
-        break
+        shareUrl = `https://wa.me/?text=${encodeURIComponent(
+          `${message} ${postUrl}`
+        )}`;
+        break;
       case "telegram":
-        shareUrl = `https://t.me/share/url?url=${encodeURIComponent(postUrl)}&text=${encodeURIComponent(message)}`
-        break
+        shareUrl = `https://t.me/share/url?url=${encodeURIComponent(
+          postUrl
+        )}&text=${encodeURIComponent(message)}`;
+        break;
       default:
-        return
+        return;
     }
 
-    window.open(shareUrl, "_blank", "noopener,noreferrer")
+    window.open(shareUrl, "_blank", "noopener,noreferrer");
 
     toast({
       title: "Opening share window",
       description: `Sharing to ${platform}`,
-    })
-  }
+    });
+  };
 
+  // Update the ShareDialog component to be mobile-friendly
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px] animate-slide-up">
+      <DialogContent className="sm:max-w-[425px] animate-slide-up dialog-content-mobile">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Share2 className="h-5 w-5" />
@@ -207,21 +239,37 @@ export function ShareDialog({ open, onOpenChange, post }: ShareDialogProps) {
           <div className="rounded-lg overflow-hidden border">
             <div className="p-2 flex items-center gap-2 bg-muted/30">
               <Avatar className="h-6 w-6">
-                <AvatarImage src={post.user.profilePicture} alt={post.user.username} />
-                <AvatarFallback>{post.user.username.charAt(0).toUpperCase()}</AvatarFallback>
+                <AvatarImage
+                  src={post.user.profilePicture}
+                  alt={post.user.username}
+                />
+                <AvatarFallback>
+                  {post.user.username.charAt(0).toUpperCase()}
+                </AvatarFallback>
               </Avatar>
               <span className="text-sm font-medium">@{post.user.username}</span>
             </div>
-            <img src={post.image || "/placeholder.svg"} alt={post.text} className="w-full h-32 object-cover" />
+            <img
+              src={post.image || "/placeholder.svg"}
+              alt={post.text}
+              className="w-full h-32 object-cover"
+            />
           </div>
 
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <Tabs
+            value={activeTab}
+            onValueChange={setActiveTab}
+            className="w-full"
+          >
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="direct">Direct Message</TabsTrigger>
               <TabsTrigger value="link">Copy Link</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="direct" className="mt-4 space-y-4 animate-fade-in">
+            <TabsContent
+              value="direct"
+              className="mt-4 space-y-4 animate-fade-in"
+            >
               <div className="space-y-2">
                 <div className="text-sm font-medium">Share message</div>
                 <Input
@@ -234,7 +282,9 @@ export function ShareDialog({ open, onOpenChange, post }: ShareDialogProps) {
 
               {/* Search input */}
               <div className="relative">
-                <div className="text-sm font-medium mb-2">Select recipients</div>
+                <div className="text-sm font-medium mb-2">
+                  Select recipients
+                </div>
                 <div className="relative">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -251,8 +301,10 @@ export function ShareDialog({ open, onOpenChange, post }: ShareDialogProps) {
               {selectedUsers.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {selectedUsers.map((userId) => {
-                    const selectedUser = connections.find((c) => c.id === userId)
-                    if (!selectedUser) return null
+                    const selectedUser = connections.find(
+                      (c) => c.id === userId
+                    );
+                    if (!selectedUser) return null;
 
                     return (
                       <div
@@ -260,8 +312,13 @@ export function ShareDialog({ open, onOpenChange, post }: ShareDialogProps) {
                         className="flex items-center gap-1 bg-primary/10 text-primary rounded-full pl-1 pr-2 py-0.5 text-xs"
                       >
                         <Avatar className="h-5 w-5">
-                          <AvatarImage src={selectedUser.profilePicture} alt={selectedUser.username} />
-                          <AvatarFallback>{selectedUser.username.charAt(0).toUpperCase()}</AvatarFallback>
+                          <AvatarImage
+                            src={selectedUser.profilePicture}
+                            alt={selectedUser.username}
+                          />
+                          <AvatarFallback>
+                            {selectedUser.username.charAt(0).toUpperCase()}
+                          </AvatarFallback>
                         </Avatar>
                         <span>{selectedUser.username}</span>
                         <button
@@ -271,7 +328,7 @@ export function ShareDialog({ open, onOpenChange, post }: ShareDialogProps) {
                           ×
                         </button>
                       </div>
-                    )
+                    );
                   })}
                 </div>
               )}
@@ -294,16 +351,25 @@ export function ShareDialog({ open, onOpenChange, post }: ShareDialogProps) {
                       <div
                         key={connection.id}
                         className={`flex items-center justify-between p-2 rounded-md hover:bg-muted/50 cursor-pointer ${
-                          selectedUsers.includes(connection.id) ? "bg-muted" : ""
+                          selectedUsers.includes(connection.id)
+                            ? "bg-muted"
+                            : ""
                         }`}
                         onClick={() => toggleUserSelection(connection.id)}
                       >
                         <div className="flex items-center gap-3">
                           <Avatar className="h-8 w-8">
-                            <AvatarImage src={connection.profilePicture} alt={connection.username} />
-                            <AvatarFallback>{connection.username.charAt(0).toUpperCase()}</AvatarFallback>
+                            <AvatarImage
+                              src={connection.profilePicture}
+                              alt={connection.username}
+                            />
+                            <AvatarFallback>
+                              {connection.username.charAt(0).toUpperCase()}
+                            </AvatarFallback>
                           </Avatar>
-                          <div className="font-medium text-sm">{connection.username}</div>
+                          <div className="font-medium text-sm">
+                            {connection.username}
+                          </div>
                         </div>
                         <div
                           className={`h-5 w-5 rounded-full border flex items-center justify-center ${
@@ -312,7 +378,9 @@ export function ShareDialog({ open, onOpenChange, post }: ShareDialogProps) {
                               : "border-muted-foreground"
                           }`}
                         >
-                          {selectedUsers.includes(connection.id) && <Check className="h-3 w-3" />}
+                          {selectedUsers.includes(connection.id) && (
+                            <Check className="h-3 w-3" />
+                          )}
                         </div>
                       </div>
                     ))}
@@ -330,13 +398,17 @@ export function ShareDialog({ open, onOpenChange, post }: ShareDialogProps) {
                 ) : (
                   <>
                     <Send className="mr-2 h-4 w-4" />
-                    Share with {selectedUsers.length} {selectedUsers.length === 1 ? "person" : "people"}
+                    Share with {selectedUsers.length}{" "}
+                    {selectedUsers.length === 1 ? "person" : "people"}
                   </>
                 )}
               </Button>
             </TabsContent>
 
-            <TabsContent value="link" className="mt-4 space-y-4 animate-fade-in">
+            <TabsContent
+              value="link"
+              className="mt-4 space-y-4 animate-fade-in"
+            >
               <div className="space-y-2">
                 <div className="text-sm font-medium">Post link</div>
                 <div className="flex items-center gap-2">
@@ -346,10 +418,16 @@ export function ShareDialog({ open, onOpenChange, post }: ShareDialogProps) {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className={`absolute right-1 top-1 h-7 w-7 ${copied ? "animate-pulse-once" : ""}`}
+                      className={`absolute right-1 top-1 h-7 w-7 ${
+                        copied ? "animate-pulse-once" : ""
+                      }`}
                       onClick={handleCopyLink}
                     >
-                      {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                      {copied ? (
+                        <Check className="h-4 w-4 text-green-500" />
+                      ) : (
+                        <Copy className="h-4 w-4" />
+                      )}
                     </Button>
                   </div>
                 </div>
@@ -451,6 +529,5 @@ export function ShareDialog({ open, onOpenChange, post }: ShareDialogProps) {
         </div>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
-

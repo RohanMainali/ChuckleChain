@@ -1,272 +1,298 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState, useEffect, useRef } from "react"
-import { formatDistanceToNow } from "date-fns"
-import { Send, ExternalLink, Image, MoreVertical, Trash2, Reply, X, Check, ArrowLeft } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import type { Conversation, Message as MessageType } from "@/lib/types"
-import { useAuth } from "@/components/auth-provider"
-import axios from "axios"
-import io from "socket.io-client"
-import { useRouter, useSearchParams } from "next/navigation"
-import Link from "next/link"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { toast } from "@/hooks/use-toast"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Badge } from "@/components/ui/badge"
-import { useMediaQuery } from "@/hooks/use-media-query"
+import { useState, useEffect, useRef } from "react";
+import { formatDistanceToNow } from "date-fns";
+import {
+  Send,
+  ExternalLink,
+  Image,
+  MoreVertical,
+  Trash2,
+  Reply,
+  X,
+  Check,
+  ArrowLeft,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import type { Conversation, Message as MessageType } from "@/lib/types";
+import { useAuth } from "@/components/auth-provider";
+import axios from "axios";
+import io from "socket.io-client";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { useMediaQuery } from "@/hooks/use-media-query";
 
 // Initialize socket connection
-let socket: any
+let socket: any;
 
 export function Messages() {
-  const { user } = useAuth()
-  const [conversations, setConversations] = useState<Conversation[]>([])
-  const [activeConversation, setActiveConversation] = useState<Conversation | null>(null)
-  const [newMessage, setNewMessage] = useState("")
-  const [loading, setLoading] = useState(true)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const socketInitialized = useRef(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const [messageImage, setMessageImage] = useState<string | null>(null)
-  const [isUploading, setIsUploading] = useState(false)
-  const [replyingTo, setReplyingTo] = useState<MessageType | null>(null)
-  const [imagePreviewOpen, setImagePreviewOpen] = useState(false)
-  const [previewImage, setPreviewImage] = useState<string | null>(null)
-  const [unreadConversations, setUnreadConversations] = useState<Set<string>>(new Set())
-  const [newMessageAnimation, setNewMessageAnimation] = useState(false)
+  const { user } = useAuth();
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeConversation, setActiveConversation] =
+    useState<Conversation | null>(null);
+  const [newMessage, setNewMessage] = useState("");
+  const [loading, setLoading] = useState(true);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const socketInitialized = useRef(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [messageImage, setMessageImage] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<MessageType | null>(null);
+  const [imagePreviewOpen, setImagePreviewOpen] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [unreadConversations, setUnreadConversations] = useState<Set<string>>(
+    new Set()
+  );
+  const [newMessageAnimation, setNewMessageAnimation] = useState(false);
 
   // Add these state variables after the existing ones:
-  const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set())
-  const [lastSeen, setLastSeen] = useState<Record<string, Date>>({})
-  const [showReadReceipts, setShowReadReceipts] = useState(true)
+  const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
+  const [lastSeen, setLastSeen] = useState<Record<string, Date>>({});
+  const [showReadReceipts, setShowReadReceipts] = useState(true);
   const [userSettings, setUserSettings] = useState({
     showOnlineStatus: true,
     showReadReceipts: true,
-  })
+  });
 
   // Initialize router at the beginning of the component
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const { isMobile } = useMediaQuery()
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { isMobile } = useMediaQuery();
 
   // Check for shared post in URL
-  const sharedPostId = searchParams?.get("share")
+  const sharedPostId = searchParams?.get("share");
 
   useEffect(() => {
     // If there's a shared post ID in the URL, find a way to share it
     if (sharedPostId && activeConversation) {
-      const postUrl = `${window.location.origin}/post/${sharedPostId}`
-      setNewMessage(`Check out this meme: ${postUrl}`)
+      const postUrl = `${window.location.origin}/post/${sharedPostId}`;
+      setNewMessage(`Check out this meme: ${postUrl}`);
     }
-  }, [sharedPostId, activeConversation])
+  }, [sharedPostId, activeConversation]);
 
   // Initialize socket connection
   useEffect(() => {
     if (user && !socketInitialized.current) {
-      console.log("Initializing socket connection for messages")
+      console.log("Initializing socket connection for messages");
 
-      try {
-        // Get token from localStorage instead of cookies
-        const token = localStorage.getItem("authToken")
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://chucklechain-api.onrender.com"
-        console.log("Connecting to socket server at:", apiUrl)
+      // Connect to the socket server with auth token
+      const token = document.cookie.split("token=")[1]?.split(";")[0];
+      socket = io("http://localhost:5001", {
+        withCredentials: true,
+        auth: { token },
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+      });
 
-        socket = io(apiUrl, {
-          withCredentials: true,
-          auth: { token },
-          reconnection: true,
-          reconnectionAttempts: 5,
-          reconnectionDelay: 1000,
-          timeout: 10000,
-        })
+      // Store socket in window for global access
+      if (typeof window !== "undefined") {
+        (window as any).socket = socket;
+      }
 
-        // Store socket in window for global access
-        if (typeof window !== "undefined") {
-          ;(window as any).socket = socket
-        }
+      // Debug socket connection
+      socket.on("connect", () => {
+        console.log("Socket connected successfully with ID:", socket.id);
+        socket.emit("getOnlineUsers");
+      });
 
-        // Debug socket connection
-        socket.on("connect", () => {
-          console.log("Socket connected successfully with ID:", socket.id)
-          socket.emit("getOnlineUsers")
-        })
+      socket.on("connect_error", (error) => {
+        console.error("Socket connection error:", error);
+      });
 
-        socket.on("connect_error", (error) => {
-          console.error("Socket connection error:", error)
-        })
+      // Listen for new messages
+      socket.on("newMessage", (message: MessageType) => {
+        console.log("New message received via socket:", message);
 
-        // Listen for new messages
-        socket.on("newMessage", (message: MessageType) => {
-          console.log("New message received via socket:", message)
+        // Update the conversations with the new message
+        setConversations((prevConversations) => {
+          // Check if this conversation already exists
+          const existingConvIndex = prevConversations.findIndex(
+            (conv) => conv.id === message.conversationId
+          );
 
-          // Update the conversations with the new message
-          setConversations((prevConversations) => {
-            // Check if this conversation already exists
-            const existingConvIndex = prevConversations.findIndex((conv) => conv.id === message.conversationId)
+          if (existingConvIndex >= 0) {
+            // Update existing conversation
+            const updatedConversations = [...prevConversations];
+            const conversation = { ...updatedConversations[existingConvIndex] };
 
-            if (existingConvIndex >= 0) {
-              // Update existing conversation
-              const updatedConversations = [...prevConversations]
-              const conversation = { ...updatedConversations[existingConvIndex] }
+            // Add the message to the conversation
+            conversation.messages = [...conversation.messages, message];
+            conversation.lastMessage = {
+              text: message.text,
+              timestamp: message.timestamp,
+            };
 
-              // Add the message to the conversation
-              conversation.messages = [...conversation.messages, message]
-              conversation.lastMessage = {
-                text: message.text,
-                timestamp: message.timestamp,
-              }
-
-              // If this is not the active conversation or the message is not from the current user,
-              // mark the conversation as unread
-              if (
-                (!activeConversation || activeConversation.id !== message.conversationId) &&
-                message.senderId !== user?.id
-              ) {
-                setUnreadConversations((prev) => new Set(prev).add(message.conversationId))
-              }
-
-              // Move this conversation to the top of the list
-              updatedConversations.splice(existingConvIndex, 1)
-              updatedConversations.unshift(conversation)
-
-              return updatedConversations
-            } else {
-              // This is a new conversation - we should fetch the full conversation data
-              fetchConversations()
-              return prevConversations
+            // If this is not the active conversation or the message is not from the current user,
+            // mark the conversation as unread
+            if (
+              (!activeConversation ||
+                activeConversation.id !== message.conversationId) &&
+              message.senderId !== user?.id
+            ) {
+              setUnreadConversations((prev) =>
+                new Set(prev).add(message.conversationId)
+              );
             }
-          })
 
-          // If the active conversation is the one receiving the message, update it
-          setActiveConversation((prev) => {
-            if (!prev || prev.id !== message.conversationId) return prev
+            // Move this conversation to the top of the list
+            updatedConversations.splice(existingConvIndex, 1);
+            updatedConversations.unshift(conversation);
 
-            // Trigger the new message animation
-            setNewMessageAnimation(true)
-            setTimeout(() => setNewMessageAnimation(false), 500)
-
-            return {
-              ...prev,
-              messages: [...prev.messages, message],
-              lastMessage: {
-                text: message.text,
-                timestamp: message.timestamp,
-              },
-            }
-          })
-        })
-
-        // Listen for message deletions
-        socket.on("messageDeleted", ({ messageId, conversationId }) => {
-          console.log("Message deletion notification received:", messageId)
-
-          // Update conversations
-          setConversations((prevConversations) =>
-            prevConversations.map((conv) => {
-              if (conv.id === conversationId) {
-                return {
-                  ...conv,
-                  messages: conv.messages.filter((msg) => msg.id !== messageId),
-                }
-              }
-              return conv
-            }),
-          )
-
-          // Update active conversation if needed
-          setActiveConversation((prev) => {
-            if (!prev || prev.id !== conversationId) return prev
-            return {
-              ...prev,
-              messages: prev.messages.filter((msg) => msg.id !== messageId),
-            }
-          })
-        })
-
-        socket.on("onlineUsers", (users: string[]) => {
-          console.log("Online users update received:", users)
-          setOnlineUsers(new Set(users))
-        })
-
-        socket.on("userConnected", (userId: string) => {
-          console.log("User connected:", userId)
-          setOnlineUsers((prev) => {
-            const updated = new Set(prev)
-            updated.add(userId)
-            return updated
-          })
-        })
-
-        socket.on("userDisconnected", (userId: string, lastActive: string) => {
-          console.log("User disconnected:", userId)
-          setOnlineUsers((prev) => {
-            const updated = new Set(prev)
-            updated.delete(userId)
-            return updated
-          })
-
-          // Update last seen time
-          if (lastActive) {
-            setLastSeen((prev) => ({
-              ...prev,
-              [userId]: new Date(lastActive),
-            }))
+            return updatedConversations;
+          } else {
+            // This is a new conversation - we should fetch the full conversation data
+            fetchConversations();
+            return prevConversations;
           }
-        })
+        });
 
-        socket.on("messageRead", ({ conversationId, messageId }) => {
-          console.log("Message read notification:", { conversationId, messageId })
+        // If the active conversation is the one receiving the message, update it
+        setActiveConversation((prev) => {
+          if (!prev || prev.id !== message.conversationId) return prev;
 
-          // Update the read status of messages
-          setActiveConversation((prev) => {
-            if (!prev || prev.id !== conversationId) return prev
+          // Trigger the new message animation
+          setNewMessageAnimation(true);
+          setTimeout(() => setNewMessageAnimation(false), 500);
 
-            return {
-              ...prev,
-              messages: prev.messages.map((msg) =>
-                msg.id === messageId || (msg.senderId !== user?.id && !msg.read) ? { ...msg, read: true } : msg,
-              ),
-            }
-          })
+          return {
+            ...prev,
+            messages: [...prev.messages, message],
+            lastMessage: {
+              text: message.text,
+              timestamp: message.timestamp,
+            },
+          };
+        });
+      });
 
-          // Also update in the conversations list
-          setConversations((prev) =>
-            prev.map((conv) => {
-              if (conv.id !== conversationId) return conv
+      // Listen for message deletions
+      socket.on("messageDeleted", ({ messageId, conversationId }) => {
+        console.log("Message deletion notification received:", messageId);
 
+        // Update conversations
+        setConversations((prevConversations) =>
+          prevConversations.map((conv) => {
+            if (conv.id === conversationId) {
               return {
                 ...conv,
-                messages: conv.messages.map((msg) =>
-                  msg.id === messageId || (msg.senderId !== user?.id && !msg.read) ? { ...msg, read: true } : msg,
-                ),
-              }
-            }),
-          )
-        })
+                messages: conv.messages.filter((msg) => msg.id !== messageId),
+              };
+            }
+            return conv;
+          })
+        );
 
-        socketInitialized.current = true
+        // Update active conversation if needed
+        setActiveConversation((prev) => {
+          if (!prev || prev.id !== conversationId) return prev;
+          return {
+            ...prev,
+            messages: prev.messages.filter((msg) => msg.id !== messageId),
+          };
+        });
+      });
 
-        // Clean up on unmount
-        return () => {
-          console.log("Disconnecting socket")
-          socket.disconnect()
-          socketInitialized.current = false
+      socket.on("onlineUsers", (users: string[]) => {
+        console.log("Online users update received:", users);
+        setOnlineUsers(new Set(users));
+      });
+
+      socket.on("userConnected", (userId: string) => {
+        console.log("User connected:", userId);
+        setOnlineUsers((prev) => {
+          const updated = new Set(prev);
+          updated.add(userId);
+          return updated;
+        });
+      });
+
+      socket.on("userDisconnected", (userId: string, lastActive: string) => {
+        console.log("User disconnected:", userId);
+        setOnlineUsers((prev) => {
+          const updated = new Set(prev);
+          updated.delete(userId);
+          return updated;
+        });
+
+        // Update last seen time
+        if (lastActive) {
+          setLastSeen((prev) => ({
+            ...prev,
+            [userId]: new Date(lastActive),
+          }));
         }
-      } catch (err) {
-        console.error("Error setting up socket:", err)
-        // Don't block the UI for socket errors
-      }
+      });
+
+      socket.on("messageRead", ({ conversationId, messageId }) => {
+        console.log("Message read notification:", {
+          conversationId,
+          messageId,
+        });
+
+        // Update the read status of messages
+        setActiveConversation((prev) => {
+          if (!prev || prev.id !== conversationId) return prev;
+
+          return {
+            ...prev,
+            messages: prev.messages.map((msg) =>
+              msg.id === messageId || (msg.senderId !== user?.id && !msg.read)
+                ? { ...msg, read: true }
+                : msg
+            ),
+          };
+        });
+
+        // Also update in the conversations list
+        setConversations((prev) =>
+          prev.map((conv) => {
+            if (conv.id !== conversationId) return conv;
+
+            return {
+              ...conv,
+              messages: conv.messages.map((msg) =>
+                msg.id === messageId || (msg.senderId !== user?.id && !msg.read)
+                  ? { ...msg, read: true }
+                  : msg
+              ),
+            };
+          })
+        );
+      });
+
+      socketInitialized.current = true;
+
+      // Clean up on unmount
+      return () => {
+        console.log("Disconnecting socket");
+        socket.disconnect();
+        socketInitialized.current = false;
+      };
     }
-  }, [user])
+  }, [user]);
 
   // Add a polling mechanism to fetch new messages periodically
   useEffect(() => {
-    if (!user || !activeConversation) return
+    if (!user || !activeConversation) return;
 
     // Set up polling for new messages every 5 seconds as a fallback
     const intervalId = setInterval(() => {
@@ -277,68 +303,69 @@ export function Messages() {
           .then(({ data }) => {
             if (data.success) {
               // Only update if there are new messages
-              if (data.data.messages.length > activeConversation.messages.length) {
-                console.log("Polling found new messages")
-                setActiveConversation(data.data)
+              if (
+                data.data.messages.length > activeConversation.messages.length
+              ) {
+                console.log("Polling found new messages");
+                setActiveConversation(data.data);
 
                 // Also update in the conversations list
-                setConversations((prev) => prev.map((conv) => (conv.id === data.data.id ? data.data : conv)))
+                setConversations((prev) =>
+                  prev.map((conv) =>
+                    conv.id === data.data.id ? data.data : conv
+                  )
+                );
               }
             }
           })
           .catch((error) => {
-            console.error("Error polling for messages:", error)
-          })
+            console.error("Error polling for messages:", error);
+          });
       }
-    }, 5000)
+    }, 5000);
 
-    return () => clearInterval(intervalId)
-  }, [user, activeConversation])
+    return () => clearInterval(intervalId);
+  }, [user, activeConversation]);
 
   // Add the fetchConversations function at the component level
   const fetchConversations = async () => {
     try {
-      setLoading(true)
-      console.log("Fetching conversations from:", `${process.env.NEXT_PUBLIC_API_URL}/api/messages/conversations`)
-
-      const { data } = await axios.get("/api/messages/conversations")
-      console.log("Conversations response:", data)
-
+      setLoading(true);
+      const { data } = await axios.get("/api/messages/conversations");
       if (data.success) {
-        setConversations(data.data)
+        setConversations(data.data);
 
         // Identify unread conversations
-        const unread = new Set<string>()
+        const unread = new Set<string>();
         data.data.forEach((conv: Conversation) => {
-          const hasUnreadMessages = conv.messages.some((msg) => !msg.read && msg.senderId !== user?.id)
+          const hasUnreadMessages = conv.messages.some(
+            (msg) => !msg.read && msg.senderId !== user?.id
+          );
           if (hasUnreadMessages) {
-            unread.add(conv.id)
+            unread.add(conv.id);
           }
-        })
-        setUnreadConversations(unread)
-      } else {
-        console.error("Failed to fetch conversations:", data.message)
+        });
+        setUnreadConversations(unread);
+
+        // Set the first conversation as active if there is one and no active conversation
+        if (data.data.length > 0 && !activeConversation) {
+          // Don't automatically set active conversation - wait for user to click
+          // setActiveConversation(data.data[0])
+        }
       }
     } catch (error) {
-      console.error("Error fetching conversations:", error)
-
-      if (error.response) {
-        console.error("Response data:", error.response.data)
-        console.error("Response status:", error.response.status)
-      } else if (error.request) {
-        console.error("No response received:", error.request)
-      }
+      console.error("Error fetching conversations:", error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   // Fetch conversations
   useEffect(() => {
     if (user) {
-      fetchConversations()
+      fetchConversations();
     }
-  }, [user])
+  }, [user]);
 
   // Fetch user settings
   useEffect(() => {
@@ -355,28 +382,30 @@ export function Messages() {
           setUserSettings({
             showOnlineStatus: true,
             showReadReceipts: true,
-          })
+          });
         } catch (error) {
-          console.error("Error fetching user settings:", error)
+          console.error("Error fetching user settings:", error);
         }
-      }
+      };
 
-      fetchUserSettings()
+      fetchUserSettings();
     }
-  }, [user])
+  }, [user]);
 
   // Mark messages as read when viewing a conversation
   useEffect(() => {
     if (activeConversation) {
       // Remove from unread conversations
       setUnreadConversations((prev) => {
-        const updated = new Set(prev)
-        updated.delete(activeConversation.id)
-        return updated
-      })
+        const updated = new Set(prev);
+        updated.delete(activeConversation.id);
+        return updated;
+      });
 
       // Check if there are any unread messages from the other user
-      const hasUnreadMessages = activeConversation.messages.some((msg) => !msg.read && msg.senderId !== user?.id)
+      const hasUnreadMessages = activeConversation.messages.some(
+        (msg) => !msg.read && msg.senderId !== user?.id
+      );
 
       if (hasUnreadMessages) {
         // Mark all messages in this conversation as read
@@ -388,36 +417,40 @@ export function Messages() {
               socket.emit("messagesRead", {
                 conversationId: activeConversation.id,
                 userId: activeConversation.user.id,
-              })
+              });
             }
 
             // Update the read status locally
             setActiveConversation((prev) => {
-              if (!prev) return null
+              if (!prev) return null;
               return {
                 ...prev,
-                messages: prev.messages.map((msg) => (msg.senderId !== user?.id ? { ...msg, read: true } : msg)),
-              }
-            })
+                messages: prev.messages.map((msg) =>
+                  msg.senderId !== user?.id ? { ...msg, read: true } : msg
+                ),
+              };
+            });
 
             // Also update in the conversations list
             setConversations((prev) =>
               prev.map((conv) => {
-                if (conv.id !== activeConversation.id) return conv
+                if (conv.id !== activeConversation.id) return conv;
 
                 return {
                   ...conv,
-                  messages: conv.messages.map((msg) => (msg.senderId !== user?.id ? { ...msg, read: true } : msg)),
-                }
-              }),
-            )
+                  messages: conv.messages.map((msg) =>
+                    msg.senderId !== user?.id ? { ...msg, read: true } : msg
+                  ),
+                };
+              })
+            );
           })
           .catch((error) => {
-            console.error("Error marking messages as read:", error)
-          })
+            console.error("Error marking messages as read:", error);
+          });
       }
     }
-  }, [activeConversation, user?.id])
+  }, [activeConversation, user?.id]);
 
   // Scroll to bottom when new messages are added, but use a fade-in animation instead
   useEffect(() => {
@@ -425,31 +458,31 @@ export function Messages() {
       messagesEndRef.current.scrollIntoView({
         behavior: isMobile ? "auto" : "smooth",
         block: "end",
-      })
+      });
     }
-  }, [activeConversation?.messages, isMobile])
+  }, [activeConversation?.messages, isMobile]);
 
   // Update the handleSendMessage function to ensure images are properly stored
   const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
 
-    if ((!newMessage.trim() && !messageImage) || !activeConversation) return
+    if ((!newMessage.trim() && !messageImage) || !activeConversation) return;
 
     try {
-      let imageUrl = null
+      let imageUrl = null;
       if (messageImage) {
-        setIsUploading(true)
+        setIsUploading(true);
         // Upload image to server
         const uploadResponse = await axios.post("/api/upload", {
           image: messageImage,
           isMessageImage: true,
-        })
+        });
 
         if (uploadResponse.data.success) {
-          imageUrl = uploadResponse.data.data.url
-          console.log("Image uploaded successfully:", imageUrl)
+          imageUrl = uploadResponse.data.data.url;
+          console.log("Image uploaded successfully:", imageUrl);
         } else {
-          throw new Error("Failed to upload image")
+          throw new Error("Failed to upload image");
         }
       }
 
@@ -462,11 +495,11 @@ export function Messages() {
         conversationId: activeConversation.id,
         image: imageUrl,
         replyTo: replyingTo ? replyingTo.id : undefined,
-      }
+      };
 
       // Update the active conversation with the new message
       setActiveConversation((prev) => {
-        if (!prev) return null
+        if (!prev) return null;
         return {
           ...prev,
           messages: [...prev.messages, tempMessage],
@@ -474,8 +507,8 @@ export function Messages() {
             text: tempMessage.text,
             timestamp: tempMessage.timestamp,
           },
-        }
-      })
+        };
+      });
 
       // Update the conversations list
       setConversations((prevConversations) => {
@@ -488,27 +521,29 @@ export function Messages() {
                 text: tempMessage.text,
                 timestamp: tempMessage.timestamp,
               },
-            }
+            };
           }
-          return conv
-        })
+          return conv;
+        });
 
         // Move the active conversation to the top
-        const activeConvIndex = updatedConversations.findIndex((conv) => conv.id === activeConversation.id)
+        const activeConvIndex = updatedConversations.findIndex(
+          (conv) => conv.id === activeConversation.id
+        );
         if (activeConvIndex > 0) {
-          const [activeConv] = updatedConversations.splice(activeConvIndex, 1)
-          updatedConversations.unshift(activeConv)
+          const [activeConv] = updatedConversations.splice(activeConvIndex, 1);
+          updatedConversations.unshift(activeConv);
         }
 
-        return updatedConversations
-      })
+        return updatedConversations;
+      });
 
       // Clear the input and reset states
-      setNewMessage("")
-      setMessageImage(null)
-      setReplyingTo(null)
+      setNewMessage("");
+      setMessageImage(null);
+      setReplyingTo(null);
       if (fileInputRef.current) {
-        fileInputRef.current.value = ""
+        fileInputRef.current.value = "";
       }
 
       // Send the message to the server
@@ -516,125 +551,132 @@ export function Messages() {
         text: newMessage.trim() || (imageUrl ? "Sent an image" : ""),
         image: imageUrl,
         replyToId: replyingTo?.id,
-      })
+      });
 
-      const { data } = await axios.post(`/api/messages/${activeConversation.id}`, {
-        text: newMessage.trim() || (imageUrl ? "Sent an image" : ""),
-        image: imageUrl,
-        replyToId: replyingTo?.id,
-      })
+      const { data } = await axios.post(
+        `/api/messages/${activeConversation.id}`,
+        {
+          text: newMessage.trim() || (imageUrl ? "Sent an image" : ""),
+          image: imageUrl,
+          replyToId: replyingTo?.id,
+        }
+      );
 
       if (!data.success) {
-        console.error("Error sending message:", data)
+        console.error("Error sending message:", data);
         toast({
           title: "Error",
           description: "Failed to send message. Please try again.",
           variant: "destructive",
-        })
+        });
         // Revert the optimistic update
-        fetchConversations()
+        fetchConversations();
       } else {
-        console.log("Message sent successfully:", data)
+        console.log("Message sent successfully:", data);
         // Replace the temp message with the real one
         setActiveConversation((prev) => {
-          if (!prev) return null
+          if (!prev) return null;
           return {
             ...prev,
-            messages: prev.messages.map((msg) => (msg.id === tempMessage.id ? data.data : msg)),
-          }
-        })
+            messages: prev.messages.map((msg) =>
+              msg.id === tempMessage.id ? data.data : msg
+            ),
+          };
+        });
       }
     } catch (error) {
-      console.error("Error sending message:", error)
+      console.error("Error sending message:", error);
       toast({
         title: "Error",
         description: "Failed to send message. Please try again.",
         variant: "destructive",
-      })
+      });
       // Revert the optimistic update on error
-      fetchConversations()
+      fetchConversations();
     } finally {
-      setIsUploading(false)
+      setIsUploading(false);
     }
-  }
+  };
 
   const handleMessageImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
+    const file = e.target.files?.[0];
     if (file) {
       if (file.size > 10 * 1024 * 1024) {
         toast({
           title: "File too large",
           description: "Image size should be less than 10MB",
           variant: "destructive",
-        })
-        return
+        });
+        return;
       }
 
-      const reader = new FileReader()
+      const reader = new FileReader();
       reader.onload = () => {
-        const result = reader.result as string
-        console.log("Image loaded, size:", result.length)
-        setMessageImage(result)
-      }
-      reader.readAsDataURL(file)
+        const result = reader.result as string;
+        console.log("Image loaded, size:", result.length);
+        setMessageImage(result);
+      };
+      reader.readAsDataURL(file);
     }
-  }
+  };
 
   const handleRemoveMessageImage = () => {
-    setMessageImage(null)
+    setMessageImage(null);
     if (fileInputRef.current) {
-      fileInputRef.current.value = ""
+      fileInputRef.current.value = "";
     }
-  }
+  };
 
   const handleDeleteMessage = async (messageId: string) => {
-    if (!activeConversation) return
+    if (!activeConversation) return;
 
     try {
       // Optimistically remove the message from UI
       setActiveConversation((prev) => {
-        if (!prev) return null
+        if (!prev) return null;
         return {
           ...prev,
           messages: prev.messages.filter((msg) => msg.id !== messageId),
-        }
-      })
+        };
+      });
 
       // Call API to delete the message
-      const { data } = await axios.delete(`/api/messages/${activeConversation.id}/${messageId}`)
+      const { data } = await axios.delete(
+        `/api/messages/${activeConversation.id}/${messageId}`
+      );
 
       if (!data.success) {
         // If deletion fails, revert the UI change
-        fetchConversations()
-        throw new Error("Failed to delete message")
+        fetchConversations();
+        throw new Error("Failed to delete message");
       }
 
       toast({
         title: "Message deleted",
         description: "Your message has been deleted",
-      })
+      });
     } catch (error) {
-      console.error("Error deleting message:", error)
+      console.error("Error deleting message:", error);
       toast({
         title: "Error",
         description: "Failed to delete message. Please try again.",
         variant: "destructive",
-      })
+      });
     }
-  }
+  };
 
   const handleReplyToMessage = (message: MessageType) => {
-    setReplyingTo(message)
-  }
+    setReplyingTo(message);
+  };
 
   const openImagePreview = (imageUrl: string) => {
-    setPreviewImage(imageUrl)
-    setImagePreviewOpen(true)
-  }
+    setPreviewImage(imageUrl);
+    setImagePreviewOpen(true);
+  };
 
   // Render a shared post in the message
   const renderSharedPost = (message: MessageType) => {
-    if (!message.sharedPost) return null
+    if (!message.sharedPost) return null;
 
     return (
       <div className="mt-2 border rounded-md overflow-hidden">
@@ -654,25 +696,30 @@ export function Messages() {
               className="w-full h-32 object-cover"
             />
             <div className="absolute bottom-0 left-0 right-0 bg-black/50 p-2 text-white text-xs">
-              <div className="font-medium">@{message.sharedPost.user?.username || "unknown"}</div>
+              <div className="font-medium">
+                @{message.sharedPost.user?.username || "unknown"}
+              </div>
               <div className="truncate">{message.sharedPost.text || ""}</div>
             </div>
           </div>
         </Link>
       </div>
-    )
-  }
+    );
+  };
 
   // Render a reply reference
   const renderReplyReference = (message: MessageType) => {
-    if (!message.replyTo) return null
+    if (!message.replyTo) return null;
 
     // Find the message being replied to
-    const repliedMessage = activeConversation?.messages.find((msg) => msg.id === message.replyTo)
-    if (!repliedMessage) return null
+    const repliedMessage = activeConversation?.messages.find(
+      (msg) => msg.id === message.replyTo
+    );
+    if (!repliedMessage) return null;
 
     // Determine if the replied message is from the current user
-    const isRepliedMessageFromCurrentUser = repliedMessage.senderId === user?.id
+    const isRepliedMessageFromCurrentUser =
+      repliedMessage.senderId === user?.id;
 
     return (
       <div className="mb-1">
@@ -686,7 +733,10 @@ export function Messages() {
           <div className="flex items-center gap-1 mb-1">
             <Reply className="h-3 w-3 text-gray-400" />
             <span className="text-xs text-gray-400">
-              Replying to {isRepliedMessageFromCurrentUser ? "yourself" : activeConversation?.user.username}
+              Replying to{" "}
+              {isRepliedMessageFromCurrentUser
+                ? "yourself"
+                : activeConversation?.user.username}
             </span>
           </div>
           <div className="text-sm truncate">
@@ -702,15 +752,15 @@ export function Messages() {
           </div>
         </div>
       </div>
-    )
-  }
+    );
+  };
 
   if (loading) {
     return (
       <div className="flex h-[calc(100vh-5rem)] items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
       </div>
-    )
+    );
   }
 
   // Make the Messages component fully responsive with original design
@@ -718,7 +768,9 @@ export function Messages() {
     <div className="grid h-[calc(100vh-5rem)] grid-cols-1 md:grid-cols-[320px_1fr] rounded-lg border bg-background text-foreground overflow-hidden">
       {/* Conversations list - with a fixed header and scrollable content */}
       <div
-        className={`flex flex-col border-b md:border-b-0 md:border-r border-gray-800/50 ${activeConversation && isMobile ? "hidden" : "block"}`}
+        className={`flex flex-col border-b md:border-b-0 md:border-r border-gray-800/50 ${
+          activeConversation && isMobile ? "hidden" : "block"
+        }`}
       >
         <div className="p-4 border-b border-gray-800/50 bg-black/20">
           <h2 className="text-xl font-bold">Messages</h2>
@@ -733,8 +785,10 @@ export function Messages() {
             ) : (
               conversations.map((conversation) => {
                 // Check if there are unread messages in this conversation
-                const hasUnreadMessages = unreadConversations.has(conversation.id)
-                const isActive = activeConversation?.id === conversation.id
+                const hasUnreadMessages = unreadConversations.has(
+                  conversation.id
+                );
+                const isActive = activeConversation?.id === conversation.id;
 
                 return (
                   <button
@@ -745,33 +799,51 @@ export function Messages() {
                     onClick={() => setActiveConversation(conversation)}
                   >
                     <div className="relative">
-                      <Avatar className={`h-12 w-12 ${hasUnreadMessages ? "ring-2 ring-indigo-500" : ""}`}>
-                        <AvatarImage src={conversation.user.profilePicture} alt={conversation.user.username} />
-                        <AvatarFallback>{conversation.user.username.charAt(0).toUpperCase()}</AvatarFallback>
+                      <Avatar
+                        className={`h-12 w-12 ${
+                          hasUnreadMessages ? "ring-2 ring-indigo-500" : ""
+                        }`}
+                      >
+                        <AvatarImage
+                          src={conversation.user.profilePicture}
+                          alt={conversation.user.username}
+                        />
+                        <AvatarFallback>
+                          {conversation.user.username.charAt(0).toUpperCase()}
+                        </AvatarFallback>
                       </Avatar>
                       {onlineUsers.has(conversation.user.id.toString()) && (
                         <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-gray-900"></span>
                       )}
                     </div>
                     <div className="flex-1 overflow-hidden">
-                      <div className={`font-medium text-lg ${hasUnreadMessages ? "font-bold text-white" : ""}`}>
+                      <div
+                        className={`font-medium text-lg ${
+                          hasUnreadMessages ? "font-bold text-white" : ""
+                        }`}
+                      >
                         {conversation.user.username}
                         {hasUnreadMessages && (
-                          <Badge variant="default" className="ml-2 bg-indigo-600 text-xs">
+                          <Badge
+                            variant="default"
+                            className="ml-2 bg-indigo-600 text-xs"
+                          >
                             New
                           </Badge>
                         )}
                       </div>
                       <div
                         className={`truncate text-sm ${
-                          hasUnreadMessages ? "font-semibold text-white" : "text-gray-400"
+                          hasUnreadMessages
+                            ? "font-semibold text-white"
+                            : "text-gray-400"
                         }`}
                       >
                         {conversation.lastMessage.text || "New conversation"}
                       </div>
                     </div>
                   </button>
-                )
+                );
               })
             )}
           </div>
@@ -780,10 +852,19 @@ export function Messages() {
 
       {/* Active conversation - with fixed layout for header, messages area and input */}
       {activeConversation ? (
-        <div className={`flex flex-col h-full overflow-hidden ${!activeConversation && isMobile ? "hidden" : "block"}`}>
+        <div
+          className={`flex flex-col h-full overflow-hidden ${
+            !activeConversation && isMobile ? "hidden" : "block"
+          }`}
+        >
           <div className="flex-shrink-0 flex items-center gap-3 border-b border-gray-800/50 p-4 bg-black/20">
             {isMobile && (
-              <Button variant="ghost" size="icon" onClick={() => setActiveConversation(null)} className="mr-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setActiveConversation(null)}
+                className="mr-2"
+              >
                 <ArrowLeft className="h-5 w-5" />
               </Button>
             )}
@@ -792,19 +873,31 @@ export function Messages() {
               className="flex items-center gap-3 hover:opacity-90 transition-opacity"
             >
               <Avatar className="h-10 w-10">
-                <AvatarImage src={activeConversation.user.profilePicture} alt={activeConversation.user.username} />
-                <AvatarFallback>{activeConversation.user.username.charAt(0).toUpperCase()}</AvatarFallback>
+                <AvatarImage
+                  src={activeConversation.user.profilePicture}
+                  alt={activeConversation.user.username}
+                />
+                <AvatarFallback>
+                  {activeConversation.user.username.charAt(0).toUpperCase()}
+                </AvatarFallback>
               </Avatar>
               <div className="flex-1">
-                <div className="font-medium text-lg">{activeConversation.user.username}</div>
+                <div className="font-medium text-lg">
+                  {activeConversation.user.username}
+                </div>
                 <div className="text-xs text-gray-400">
                   {onlineUsers.has(activeConversation.user.id.toString())
                     ? "Active now"
                     : lastSeen[activeConversation.user.id.toString()]
-                      ? `Last seen ${formatDistanceToNow(new Date(lastSeen[activeConversation.user.id.toString()]), {
+                    ? `Last seen ${formatDistanceToNow(
+                        new Date(
+                          lastSeen[activeConversation.user.id.toString()]
+                        ),
+                        {
                           addSuffix: true,
-                        })}`
-                      : "Offline"}
+                        }
+                      )}`
+                    : "Offline"}
                 </div>
               </div>
             </Link>
@@ -815,28 +908,39 @@ export function Messages() {
               {activeConversation.messages.map((message, index) => {
                 // Message rendering logic remains the same
                 // No changes needed here, just reinstating the existing code:
-                const isCurrentUser = message.senderId === user?.id
-                const isLastMessage = index === activeConversation.messages.length - 1
+                const isCurrentUser = message.senderId === user?.id;
+                const isLastMessage =
+                  index === activeConversation.messages.length - 1;
                 const showAvatar =
                   index === 0 ||
-                  activeConversation.messages[index - 1].senderId !== message.senderId ||
+                  activeConversation.messages[index - 1].senderId !==
+                    message.senderId ||
                   new Date(message.timestamp).getTime() -
-                    new Date(activeConversation.messages[index - 1].timestamp).getTime() >
-                    5 * 60 * 1000
+                    new Date(
+                      activeConversation.messages[index - 1].timestamp
+                    ).getTime() >
+                    5 * 60 * 1000;
 
                 // Group messages by sender
                 const isFirstInGroup =
-                  index === 0 || activeConversation.messages[index - 1].senderId !== message.senderId
+                  index === 0 ||
+                  activeConversation.messages[index - 1].senderId !==
+                    message.senderId;
 
                 const isLastInGroup =
                   index === activeConversation.messages.length - 1 ||
-                  activeConversation.messages[index + 1].senderId !== message.senderId
+                  activeConversation.messages[index + 1].senderId !==
+                    message.senderId;
 
                 return (
                   <div
                     key={message.id}
-                    className={`flex ${isCurrentUser ? "justify-end" : "justify-start"} ${
-                      isLastMessage && newMessageAnimation ? "animate-pulse" : ""
+                    className={`flex ${
+                      isCurrentUser ? "justify-end" : "justify-start"
+                    } ${
+                      isLastMessage && newMessageAnimation
+                        ? "animate-pulse"
+                        : ""
                     }`}
                   >
                     {!isCurrentUser && showAvatar ? (
@@ -845,40 +949,58 @@ export function Messages() {
                           src={activeConversation.user.profilePicture}
                           alt={activeConversation.user.username}
                         />
-                        <AvatarFallback>{activeConversation.user.username.charAt(0).toUpperCase()}</AvatarFallback>
+                        <AvatarFallback>
+                          {activeConversation.user.username
+                            .charAt(0)
+                            .toUpperCase()}
+                        </AvatarFallback>
                       </Avatar>
                     ) : (
-                      !isCurrentUser && <div className="w-10 flex-shrink-0"></div>
+                      !isCurrentUser && (
+                        <div className="w-10 flex-shrink-0"></div>
+                      )
                     )}
 
-                    <div className={`max-w-[70%] flex flex-col ${isCurrentUser ? "items-end" : "items-start"}`}>
+                    <div
+                      className={`max-w-[70%] flex flex-col ${
+                        isCurrentUser ? "items-end" : "items-start"
+                      }`}
+                    >
                       {/* Show username only for the first message in a group */}
                       {!isCurrentUser && isFirstInGroup && (
-                        <div className="mb-1 text-xs text-gray-400">{activeConversation.user.username}</div>
+                        <div className="mb-1 text-xs text-gray-400">
+                          {activeConversation.user.username}
+                        </div>
                       )}
 
-                      <div className={`flex flex-col ${isCurrentUser ? "items-end" : "items-start"}`}>
+                      <div
+                        className={`flex flex-col ${
+                          isCurrentUser ? "items-end" : "items-start"
+                        }`}
+                      >
                         {/* Reply reference */}
                         {message.replyTo && renderReplyReference(message)}
 
                         <div
                           className={`px-4 py-2 ${
-                            isCurrentUser ? "bg-indigo-600 text-white" : "bg-gray-800 text-white"
+                            isCurrentUser
+                              ? "bg-indigo-600 text-white"
+                              : "bg-gray-800 text-white"
                           } relative group ${
                             // Apply different border radius based on position in group
                             isFirstInGroup && isLastInGroup
                               ? "rounded-2xl"
                               : isFirstInGroup
-                                ? isCurrentUser
-                                  ? "rounded-2xl rounded-br-lg"
-                                  : "rounded-2xl rounded-bl-lg"
-                                : isLastInGroup
-                                  ? isCurrentUser
-                                    ? "rounded-2xl rounded-tr-lg"
-                                    : "rounded-2xl rounded-tl-lg"
-                                  : isCurrentUser
-                                    ? "rounded-2xl rounded-r-lg"
-                                    : "rounded-2xl rounded-l-lg"
+                              ? isCurrentUser
+                                ? "rounded-2xl rounded-br-lg"
+                                : "rounded-2xl rounded-bl-lg"
+                              : isLastInGroup
+                              ? isCurrentUser
+                                ? "rounded-2xl rounded-tr-lg"
+                                : "rounded-2xl rounded-tl-lg"
+                              : isCurrentUser
+                              ? "rounded-2xl rounded-r-lg"
+                              : "rounded-2xl rounded-l-lg"
                           }`}
                         >
                           {/* Message text */}
@@ -901,19 +1023,30 @@ export function Messages() {
 
                           {/* Message timestamp and actions */}
                           <div className="mt-1 flex items-center justify-end gap-2 text-xs">
-                            <span className={isCurrentUser ? "text-white/80" : "text-gray-400"}>
-                              {formatDistanceToNow(new Date(message.timestamp), {
-                                addSuffix: true,
-                              })}
+                            <span
+                              className={
+                                isCurrentUser
+                                  ? "text-white/80"
+                                  : "text-gray-400"
+                              }
+                            >
+                              {formatDistanceToNow(
+                                new Date(message.timestamp),
+                                {
+                                  addSuffix: true,
+                                }
+                              )}
                             </span>
 
                             {/* "Seen" receipt (previously "Read") */}
-                            {isCurrentUser && userSettings.showReadReceipts && message.read && (
-                              <span className="text-indigo-300 text-[10px] flex items-center ml-2">
-                                <Check className="h-3 w-3 mr-0.5" />
-                                Seen
-                              </span>
-                            )}
+                            {isCurrentUser &&
+                              userSettings.showReadReceipts &&
+                              message.read && (
+                                <span className="text-indigo-300 text-[10px] flex items-center ml-2">
+                                  <Check className="h-3 w-3 mr-0.5" />
+                                  Seen
+                                </span>
+                              )}
 
                             {/* Actions that appear on hover */}
                             <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center">
@@ -937,9 +1070,14 @@ export function Messages() {
                                       <MoreVertical className="h-3 w-3" />
                                     </Button>
                                   </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" className="bg-gray-900 text-white border-gray-700">
+                                  <DropdownMenuContent
+                                    align="end"
+                                    className="bg-gray-900 text-white border-gray-700"
+                                  >
                                     <DropdownMenuItem
-                                      onClick={() => handleDeleteMessage(message.id)}
+                                      onClick={() =>
+                                        handleDeleteMessage(message.id)
+                                      }
                                       className="text-red-400 hover:bg-gray-800"
                                     >
                                       <Trash2 className="mr-2 h-4 w-4" />
@@ -954,7 +1092,7 @@ export function Messages() {
                       </div>
                     </div>
                   </div>
-                )
+                );
               })}
               <div ref={messagesEndRef} />
             </div>
@@ -967,10 +1105,15 @@ export function Messages() {
                 <div className="flex items-center gap-1">
                   <Reply className="h-4 w-4 text-gray-400" />
                   <div className="text-xs text-gray-400">
-                    Replying to {replyingTo.senderId === user?.id ? "yourself" : activeConversation.user.username}
+                    Replying to{" "}
+                    {replyingTo.senderId === user?.id
+                      ? "yourself"
+                      : activeConversation.user.username}
                   </div>
                 </div>
-                <div className="text-sm truncate">{replyingTo.text || (replyingTo.image ? "Image" : "Message")}</div>
+                <div className="text-sm truncate">
+                  {replyingTo.text || (replyingTo.image ? "Image" : "Message")}
+                </div>
               </div>
               <Button
                 variant="ghost"
@@ -1052,7 +1195,9 @@ export function Messages() {
         <div className="flex flex-1 items-center justify-center h-full bg-transparent md:flex hidden">
           <div className="text-center">
             <h3 className="text-lg font-medium">No conversation selected</h3>
-            <p className="text-gray-400">Select a conversation from the list to start chatting</p>
+            <p className="text-gray-400">
+              Select a conversation from the list to start chatting
+            </p>
           </div>
         </div>
       )}
@@ -1075,6 +1220,5 @@ export function Messages() {
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }
-

@@ -1,14 +1,19 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Edit,
   Grid3X3,
@@ -21,111 +26,92 @@ import {
   Calendar,
   MapPin,
   LinkIcon,
-} from "lucide-react"
-import { useAuth } from "@/components/auth-provider"
-import { Post } from "@/components/post"
-import { EditProfileDialog } from "@/components/edit-profile-dialog"
-import { SettingsDialog } from "@/components/settings-dialog"
-import type { UserProfile, Post as PostType } from "@/lib/types"
-import axios from "axios"
-import { toast } from "@/hooks/use-toast"
-import { useMobile } from "@/hooks/use-mobile"
+} from "lucide-react";
+import { useAuth } from "@/components/auth-provider";
+import { Post } from "@/components/post";
+import { EditProfileDialog } from "@/components/edit-profile-dialog";
+import { SettingsDialog } from "@/components/settings-dialog";
+import type { UserProfile, Post as PostType } from "@/lib/types";
+import axios from "axios";
+import { toast } from "@/hooks/use-toast";
+import { useMobile } from "@/hooks/use-mobile";
 
 interface ProfileProps {
-  profile: UserProfile
-  username: string
+  profile: UserProfile;
+  username: string;
 }
 
 interface FollowUser {
-  id: string
-  username: string
-  profilePicture: string
-  isFollowing?: boolean
+  id: string;
+  username: string;
+  profilePicture: string;
+  isFollowing?: boolean;
 }
 
 export function Profile({ profile: initialProfile, username }: ProfileProps) {
-  const { user, updateUser } = useAuth()
-  const router = useRouter()
-  const { isMobile } = useMobile()
-  const [isFollowing, setIsFollowing] = useState(initialProfile?.isFollowing || false)
-  const [followerCount, setFollowerCount] = useState(initialProfile?.followers || 0)
-  const [followingCount, setFollowingCount] = useState(initialProfile?.following || 0)
-  const [posts, setPosts] = useState<PostType[]>(initialProfile?.posts || [])
-  const [isEditProfileOpen, setIsEditProfileOpen] = useState(false)
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const [currentProfile, setCurrentProfile] = useState<UserProfile>(initialProfile)
-  const [loading, setLoading] = useState(true)
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
+  const { user, updateUser } = useAuth();
+  const router = useRouter();
+  const { isMobile } = useMobile();
+  const [isFollowing, setIsFollowing] = useState(
+    initialProfile?.isFollowing || false
+  );
+  const [followerCount, setFollowerCount] = useState(
+    initialProfile?.followers || 0
+  );
+  const [followingCount, setFollowingCount] = useState(
+    initialProfile?.following || 0
+  );
+  const [posts, setPosts] = useState<PostType[]>(initialProfile?.posts || []);
+  const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [currentProfile, setCurrentProfile] =
+    useState<UserProfile>(initialProfile);
+  const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   // Followers/Following dialog state
-  const [followDialogOpen, setFollowDialogOpen] = useState(false)
-  const [followDialogType, setFollowDialogType] = useState<"followers" | "following">("followers")
-  const [followUsers, setFollowUsers] = useState<FollowUser[]>([])
-  const [loadingFollowUsers, setLoadingFollowUsers] = useState(false)
+  const [followDialogOpen, setFollowDialogOpen] = useState(false);
+  const [followDialogType, setFollowDialogType] = useState<
+    "followers" | "following"
+  >("followers");
+  const [followUsers, setFollowUsers] = useState<FollowUser[]>([]);
+  const [loadingFollowUsers, setLoadingFollowUsers] = useState(false);
 
-  const isCurrentUser = user?.username === username
+  const isCurrentUser = user?.username === username;
 
   // Fetch profile data from API
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        setLoading(true)
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://chucklechain-api.onrender.com"
-        const endpoint = isCurrentUser ? "/api/users/me" : `/api/users/${username}`
-        console.log(`Fetching profile from ${apiUrl}${endpoint}`)
-
-        const { data } = await axios.get(endpoint)
-        console.log("Profile response:", data)
+        setLoading(true);
+        const endpoint = isCurrentUser
+          ? "/api/users/me"
+          : `/api/users/${username}`;
+        const { data } = await axios.get(endpoint);
 
         if (data.success) {
-          setCurrentProfile(data.data.user)
-          setPosts(data.data.posts)
-          setIsFollowing(data.data.user.isFollowing)
-          setFollowerCount(data.data.user.followers)
-          setFollowingCount(data.data.user.following)
-        } else {
-          console.error("Failed to fetch profile:", data.message)
-          toast({
-            title: "Error",
-            description: "Failed to load profile: " + (data.message || "Unknown error"),
-            variant: "destructive",
-          })
+          setCurrentProfile(data.data.user);
+          setPosts(data.data.posts);
+          setIsFollowing(data.data.user.isFollowing);
+          setFollowerCount(data.data.user.followers);
+          setFollowingCount(data.data.user.following);
         }
       } catch (error) {
-        console.error("Error fetching profile:", error)
-
-        if (error.response) {
-          console.error("Response data:", error.response.data)
-          console.error("Response status:", error.response.status)
-          toast({
-            title: "Error",
-            description: `Server error: ${error.response.status} - ${error.response.data?.message || "Unknown error"}`,
-            variant: "destructive",
-          })
-        } else if (error.request) {
-          console.error("No response received:", error.request)
-          toast({
-            title: "Error",
-            description: "Network error: Could not connect to server",
-            variant: "destructive",
-          })
-        } else {
-          console.error("Request error:", error.message)
-          toast({
-            title: "Error",
-            description: `Error: ${error.message}`,
-            variant: "destructive",
-          })
-        }
+        console.error("Error fetching profile:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load profile. Please try again.",
+          variant: "destructive",
+        });
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
     if (user) {
-      fetchProfile()
+      fetchProfile();
     }
-  }, [user, username, isCurrentUser])
+  }, [user, username, isCurrentUser]);
 
   // Update profile when user changes (for username updates from settings)
   useEffect(() => {
@@ -134,58 +120,60 @@ export function Profile({ profile: initialProfile, username }: ProfileProps) {
         ...prev,
         username: user.username,
         profilePicture: user.profilePicture,
-      }))
+      }));
     }
-  }, [user, isCurrentUser])
+  }, [user, isCurrentUser]);
 
   const handleFollow = async () => {
     try {
-      const { data } = await axios.put(`/api/users/${username}/follow`)
+      const { data } = await axios.put(`/api/users/${username}/follow`);
 
       if (data.success) {
-        setIsFollowing(data.data.isFollowing)
-        setFollowerCount((prev) => (data.data.isFollowing ? prev + 1 : prev - 1))
+        setIsFollowing(data.data.isFollowing);
+        setFollowerCount((prev) =>
+          data.data.isFollowing ? prev + 1 : prev - 1
+        );
 
         // Show toast notification
         if (data.data.isFollowing) {
           toast({
             title: "Success",
             description: `You are now following ${username}`,
-          })
+          });
         } else {
           toast({
             title: "Success",
             description: `You have unfollowed ${username}`,
-          })
+          });
         }
 
         // Refresh the profile to ensure counts are accurate
         setTimeout(() => {
-          router.refresh()
-        }, 500)
+          router.refresh();
+        }, 500);
       }
     } catch (error) {
-      console.error("Error following/unfollowing user:", error)
+      console.error("Error following/unfollowing user:", error);
       toast({
         title: "Error",
         description: "Failed to follow/unfollow user. Please try again.",
         variant: "destructive",
-      })
+      });
     }
-  }
+  };
 
   const handleDeletePost = async (postId: string) => {
     try {
-      await axios.delete(`/api/posts/${postId}`)
-      setPosts(posts.filter((post) => post.id !== postId))
+      await axios.delete(`/api/posts/${postId}`);
+      setPosts(posts.filter((post) => post.id !== postId));
     } catch (error) {
-      console.error("Error deleting post:", error)
+      console.error("Error deleting post:", error);
     }
-  }
+  };
 
   const handleLikePost = async (postId: string) => {
     try {
-      const { data } = await axios.put(`/api/posts/${postId}/like`)
+      const { data } = await axios.put(`/api/posts/${postId}/like`);
 
       if (data.success) {
         setPosts(
@@ -195,30 +183,39 @@ export function Profile({ profile: initialProfile, username }: ProfileProps) {
                 ...post,
                 isLiked: data.data.isLiked,
                 likes: data.data.isLiked ? post.likes + 1 : post.likes - 1,
-              }
+              };
             }
-            return post
-          }),
-        )
+            return post;
+          })
+        );
       }
     } catch (error) {
-      console.error("Error liking post:", error)
+      console.error("Error liking post:", error);
     }
-  }
+  };
 
   const handleAddComment = async (
     postId: string,
-    comment: { id: string; user: string; text: string; isRefreshTrigger?: boolean },
+    comment: {
+      id: string;
+      user: string;
+      text: string;
+      isRefreshTrigger?: boolean;
+    }
   ) => {
     // If this is just a refresh trigger, don't make an API call
     if (comment.isRefreshTrigger) {
       // Create a new posts array to force a re-render
-      setPosts((currentPosts) => currentPosts.map((post) => (post.id === postId ? { ...post } : post)))
-      return
+      setPosts((currentPosts) =>
+        currentPosts.map((post) => (post.id === postId ? { ...post } : post))
+      );
+      return;
     }
 
     try {
-      const { data } = await axios.post(`/api/posts/${postId}/comments`, { text: comment.text })
+      const { data } = await axios.post(`/api/posts/${postId}/comments`, {
+        text: comment.text,
+      });
 
       if (data.success) {
         setPosts(
@@ -227,44 +224,45 @@ export function Profile({ profile: initialProfile, username }: ProfileProps) {
               return {
                 ...post,
                 comments: [...post.comments, data.data],
-              }
+              };
             }
-            return post
-          }),
-        )
+            return post;
+          })
+        );
       }
     } catch (error) {
-      console.error("Error adding comment:", error)
+      console.error("Error adding comment:", error);
     }
-  }
+  };
 
   const handleProfileUpdate = async (updatedProfile: Partial<UserProfile>) => {
     try {
-      const { data } = await axios.put("/api/users/me", updatedProfile)
+      const { data } = await axios.put("/api/users/me", updatedProfile);
 
       if (data.success) {
         // Update the profile
         setCurrentProfile((prev) => ({
           ...prev,
           ...updatedProfile,
-        }))
+        }));
 
         // If this is the current user, also update the auth context
         if (isCurrentUser && user) {
           updateUser({
             ...user,
             username: updatedProfile.username || user.username,
-            profilePicture: updatedProfile.profilePicture || user.profilePicture,
+            profilePicture:
+              updatedProfile.profilePicture || user.profilePicture,
             bio: updatedProfile.bio || user.bio,
-          })
+          });
         }
       }
 
-      setIsEditProfileOpen(false)
+      setIsEditProfileOpen(false);
     } catch (error) {
-      console.error("Error updating profile:", error)
+      console.error("Error updating profile:", error);
     }
-  }
+  };
 
   const handleMessageUser = () => {
     // Create or get conversation with this user
@@ -274,104 +272,110 @@ export function Profile({ profile: initialProfile, username }: ProfileProps) {
         .then(({ data }) => {
           if (data.success) {
             // Navigate to messages page
-            router.push("/messages")
+            router.push("/messages");
           }
         })
         .catch((error) => {
-          console.error("Error creating conversation:", error)
-        })
+          console.error("Error creating conversation:", error);
+        });
     }
-  }
+  };
 
   const openFollowDialog = async (type: "followers" | "following") => {
-    setFollowDialogType(type)
-    setFollowDialogOpen(true)
-    setLoadingFollowUsers(true)
+    setFollowDialogType(type);
+    setFollowDialogOpen(true);
+    setLoadingFollowUsers(true);
 
     try {
-      const { data } = await axios.get(`/api/users/${username}/${type}`)
+      const { data } = await axios.get(`/api/users/${username}/${type}`);
       if (data.success) {
-        setFollowUsers(data.data || [])
+        setFollowUsers(data.data || []);
       } else {
         toast({
           title: "Error",
           description: `Failed to load ${type}. Please try again.`,
           variant: "destructive",
-        })
-        setFollowUsers([])
+        });
+        setFollowUsers([]);
       }
     } catch (error) {
-      console.error(`Error fetching ${type}:`, error)
-      setFollowUsers([]) // Initialize with empty array to avoid undefined issues
+      console.error(`Error fetching ${type}:`, error);
+      setFollowUsers([]); // Initialize with empty array to avoid undefined issues
       toast({
         title: "Error",
         description: `Failed to load ${type}. Please try again.`,
         variant: "destructive",
-      })
+      });
     } finally {
-      setLoadingFollowUsers(false)
+      setLoadingFollowUsers(false);
     }
-  }
+  };
 
   const handleFollowFromDialog = async (userId: string) => {
     try {
-      const userToFollow = followUsers.find((u) => u.id === userId)
-      if (!userToFollow) return
+      const userToFollow = followUsers.find((u) => u.id === userId);
+      if (!userToFollow) return;
 
-      const { data } = await axios.put(`/api/users/${userToFollow.username}/follow`)
+      const { data } = await axios.put(
+        `/api/users/${userToFollow.username}/follow`
+      );
 
       if (data.success) {
         // Update the follow status in the list
-        setFollowUsers(followUsers.map((u) => (u.id === userId ? { ...u, isFollowing: data.data.isFollowing } : u)))
+        setFollowUsers(
+          followUsers.map((u) =>
+            u.id === userId ? { ...u, isFollowing: data.data.isFollowing } : u
+          )
+        );
 
         // Show toast notification
         if (data.data.isFollowing) {
           toast({
             title: "Success",
             description: `You are now following ${userToFollow.username}`,
-          })
+          });
         } else {
           toast({
             title: "Success",
             description: `You have unfollowed ${userToFollow.username}`,
-          })
+          });
         }
 
         // Refresh the profile data after following/unfollowing
         setTimeout(() => {
-          router.refresh()
-        }, 500)
+          router.refresh();
+        }, 500);
       }
     } catch (error) {
-      console.error("Error following/unfollowing user:", error)
+      console.error("Error following/unfollowing user:", error);
       toast({
         title: "Error",
         description: "Failed to follow/unfollow user. Please try again.",
         variant: "destructive",
-      })
+      });
     }
-  }
+  };
 
   // Debug function to help diagnose relationship issues
   const handleDebugRelationships = async () => {
     try {
-      const { data } = await axios.get("/api/users/debug-relationships")
-      console.log("Debug relationships:", data)
+      const { data } = await axios.get("/api/users/debug-relationships");
+      console.log("Debug relationships:", data);
       toast({
         title: "Debug Info",
         description: `Check console for relationship data`,
-      })
+      });
     } catch (error) {
-      console.error("Error debugging relationships:", error)
+      console.error("Error debugging relationships:", error);
     }
-  }
+  };
 
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
       </div>
-    )
+    );
   }
 
   // Render different profile card layouts for mobile and desktop
@@ -389,7 +393,10 @@ export function Profile({ profile: initialProfile, username }: ProfileProps) {
               {/* Avatar with border */}
               <div className="flex justify-center">
                 <Avatar className="h-24 w-24 border-4 border-background shadow-lg">
-                  <AvatarImage src={currentProfile.profilePicture} alt={currentProfile.username} />
+                  <AvatarImage
+                    src={currentProfile.profilePicture}
+                    alt={currentProfile.username}
+                  />
                   <AvatarFallback className="text-2xl">
                     {currentProfile.username.charAt(0).toUpperCase()}
                   </AvatarFallback>
@@ -398,8 +405,12 @@ export function Profile({ profile: initialProfile, username }: ProfileProps) {
 
               {/* Username and buttons */}
               <div className="mt-4 text-center">
-                <h1 className="text-2xl font-bold mb-1">{currentProfile.username}</h1>
-                <h2 className="text-lg text-muted-foreground mb-3">{currentProfile.fullName}</h2>
+                <h1 className="text-2xl font-bold mb-1">
+                  {currentProfile.username}
+                </h1>
+                <h2 className="text-lg text-muted-foreground mb-3">
+                  {currentProfile.fullName}
+                </h2>
 
                 {/* Bio with styled container */}
                 {currentProfile.bio && (
@@ -439,7 +450,11 @@ export function Profile({ profile: initialProfile, username }: ProfileProps) {
                       >
                         {isFollowing ? "Following" : "Follow"}
                       </Button>
-                      <Button variant="outline" onClick={handleMessageUser} className="rounded-full">
+                      <Button
+                        variant="outline"
+                        onClick={handleMessageUser}
+                        className="rounded-full"
+                      >
                         <MessageSquare className="mr-2 h-4 w-4" />
                         Message
                       </Button>
@@ -449,13 +464,23 @@ export function Profile({ profile: initialProfile, username }: ProfileProps) {
 
                 {/* Stats with styled container */}
                 <div className="flex justify-center gap-8 mt-4 py-3 px-2 bg-black/10 rounded-lg">
-                  <button className="text-center hover:opacity-80" onClick={() => openFollowDialog("followers")}>
+                  <button
+                    className="text-center hover:opacity-80"
+                    onClick={() => openFollowDialog("followers")}
+                  >
                     <div className="font-bold text-lg">{followerCount}</div>
-                    <div className="text-xs text-muted-foreground">Followers</div>
+                    <div className="text-xs text-muted-foreground">
+                      Followers
+                    </div>
                   </button>
-                  <button className="text-center hover:opacity-80" onClick={() => openFollowDialog("following")}>
+                  <button
+                    className="text-center hover:opacity-80"
+                    onClick={() => openFollowDialog("following")}
+                  >
                     <div className="font-bold text-lg">{followingCount}</div>
-                    <div className="text-xs text-muted-foreground">Following</div>
+                    <div className="text-xs text-muted-foreground">
+                      Following
+                    </div>
                   </button>
                   <div className="text-center">
                     <div className="font-bold text-lg">{posts.length}</div>
@@ -464,7 +489,9 @@ export function Profile({ profile: initialProfile, username }: ProfileProps) {
                 </div>
 
                 {/* Additional profile info */}
-                {(currentProfile.location || currentProfile.website || currentProfile.joinDate) && (
+                {(currentProfile.location ||
+                  currentProfile.website ||
+                  currentProfile.joinDate) && (
                   <div className="mt-4 flex flex-col gap-2 text-sm">
                     {currentProfile.location && (
                       <div className="flex items-center justify-center gap-1 text-muted-foreground">
@@ -488,7 +515,12 @@ export function Profile({ profile: initialProfile, username }: ProfileProps) {
                     {currentProfile.joinDate && (
                       <div className="flex items-center justify-center gap-1 text-muted-foreground">
                         <Calendar className="h-3 w-3" />
-                        <span>Joined {new Date(currentProfile.joinDate).toLocaleDateString()}</span>
+                        <span>
+                          Joined{" "}
+                          {new Date(
+                            currentProfile.joinDate
+                          ).toLocaleDateString()}
+                        </span>
                       </div>
                     )}
                   </div>
@@ -497,7 +529,7 @@ export function Profile({ profile: initialProfile, username }: ProfileProps) {
             </div>
           </CardContent>
         </Card>
-      )
+      );
     } else {
       // Original desktop layout
       return (
@@ -505,21 +537,36 @@ export function Profile({ profile: initialProfile, username }: ProfileProps) {
           <CardContent className="p-6">
             <div className="flex flex-col items-center gap-6 md:flex-row md:items-start">
               <Avatar className="h-24 w-24 md:h-32 md:w-32">
-                <AvatarImage src={currentProfile.profilePicture} alt={currentProfile.username} />
-                <AvatarFallback className="text-2xl">{currentProfile.username.charAt(0).toUpperCase()}</AvatarFallback>
+                <AvatarImage
+                  src={currentProfile.profilePicture}
+                  alt={currentProfile.username}
+                />
+                <AvatarFallback className="text-2xl">
+                  {currentProfile.username.charAt(0).toUpperCase()}
+                </AvatarFallback>
               </Avatar>
 
               <div className="flex flex-1 flex-col items-center text-center md:items-start md:text-left">
                 <div className="flex flex-wrap items-center gap-4">
-                  <h1 className="text-2xl font-bold">{currentProfile.username}</h1>
+                  <h1 className="text-2xl font-bold">
+                    {currentProfile.username}
+                  </h1>
 
                   {isCurrentUser ? (
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => setIsEditProfileOpen(true)}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsEditProfileOpen(true)}
+                      >
                         <Edit className="mr-2 h-4 w-4" />
                         Edit Profile
                       </Button>
-                      <Button variant="outline" size="icon" onClick={() => setIsSettingsOpen(true)}>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setIsSettingsOpen(true)}
+                      >
                         <Settings className="h-4 w-4" />
                       </Button>
                       <Button
@@ -549,13 +596,23 @@ export function Profile({ profile: initialProfile, username }: ProfileProps) {
                 </div>
 
                 <div className="mt-4 flex gap-6">
-                  <button className="text-center hover:opacity-80" onClick={() => openFollowDialog("followers")}>
+                  <button
+                    className="text-center hover:opacity-80"
+                    onClick={() => openFollowDialog("followers")}
+                  >
                     <div className="font-bold">{followerCount}</div>
-                    <div className="text-sm text-muted-foreground">Followers</div>
+                    <div className="text-sm text-muted-foreground">
+                      Followers
+                    </div>
                   </button>
-                  <button className="text-center hover:opacity-80" onClick={() => openFollowDialog("following")}>
+                  <button
+                    className="text-center hover:opacity-80"
+                    onClick={() => openFollowDialog("following")}
+                  >
                     <div className="font-bold">{followingCount}</div>
-                    <div className="text-sm text-muted-foreground">Following</div>
+                    <div className="text-sm text-muted-foreground">
+                      Following
+                    </div>
                   </button>
                   <div className="text-center">
                     <div className="font-bold">{posts.length}</div>
@@ -581,9 +638,9 @@ export function Profile({ profile: initialProfile, username }: ProfileProps) {
             </div>
           </CardContent>
         </Card>
-      )
+      );
     }
-  }
+  };
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -688,7 +745,9 @@ export function Profile({ profile: initialProfile, username }: ProfileProps) {
       <Dialog open={followDialogOpen} onOpenChange={setFollowDialogOpen}>
         <DialogContent className="sm:max-w-[425px] animate-slide-up">
           <DialogHeader>
-            <DialogTitle>{followDialogType === "followers" ? "Followers" : "Following"}</DialogTitle>
+            <DialogTitle>
+              {followDialogType === "followers" ? "Followers" : "Following"}
+            </DialogTitle>
           </DialogHeader>
           <ScrollArea className="h-[300px] pr-4">
             {loadingFollowUsers ? (
@@ -704,15 +763,23 @@ export function Profile({ profile: initialProfile, username }: ProfileProps) {
             ) : (
               <div className="space-y-4">
                 {followUsers.map((followUser) => (
-                  <div key={followUser.id} className="flex items-center justify-between">
+                  <div
+                    key={followUser.id}
+                    className="flex items-center justify-between"
+                  >
                     <Link
                       href={`/profile/${followUser.username}`}
                       className="flex items-center gap-3 hover:opacity-80"
                       onClick={() => setFollowDialogOpen(false)}
                     >
                       <Avatar>
-                        <AvatarImage src={followUser.profilePicture} alt={followUser.username} />
-                        <AvatarFallback>{followUser.username.charAt(0).toUpperCase()}</AvatarFallback>
+                        <AvatarImage
+                          src={followUser.profilePicture}
+                          alt={followUser.username}
+                        />
+                        <AvatarFallback>
+                          {followUser.username.charAt(0).toUpperCase()}
+                        </AvatarFallback>
                       </Avatar>
                       <div className="font-medium">{followUser.username}</div>
                     </Link>
@@ -734,6 +801,5 @@ export function Profile({ profile: initialProfile, username }: ProfileProps) {
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }
-
